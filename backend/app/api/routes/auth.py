@@ -6,6 +6,7 @@ from app.models.user import User
 from app.core.security import create_access_token, verify_token, OIDCUserInfo
 from app.api.deps import get_current_user
 from app.core.passwords import verify_password
+from app.core.permissions import require
 
 router = APIRouter()
 
@@ -31,6 +32,6 @@ def read_users_me(current_user: OIDCUserInfo = Depends(get_current_user)):
 
 
 @router.get('/demo-users')
-def list_demo_approvers(db: Session = Depends(get_db), current_user: OIDCUserInfo = Depends(get_current_user)):
+def list_demo_approvers(db: Session = Depends(get_db), current_user: OIDCUserInfo = Depends(require('auth.demo_users'))):
     users = db.query(User).filter(User.role.in_(['officer', 'validator', 'finance'])).order_by(User.role, User.full_name).all()
     return [{'id': str(user.id), 'name': user.full_name, 'role': user.role} for user in users]

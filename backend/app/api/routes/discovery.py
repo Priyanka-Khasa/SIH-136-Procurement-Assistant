@@ -262,7 +262,7 @@ async def upload_manual_verification(
     if len(contents) > MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=413, detail='Documents must be 5 MB or smaller.')
 
-    safe_filename = Path(document.filename or 'supporting-document').name.replace('\x00', '')[:180]
+    safe_filename = Path((document.filename or 'supporting-document').replace('\\', '/')).name.replace('\x00', '')[:180]
     digest = hashlib.sha256(contents).hexdigest()
     upload_id = uuid4()
     upload_root = Path(os.getenv('MANUAL_UPLOAD_DIR', './uploads')).resolve()

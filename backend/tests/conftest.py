@@ -114,6 +114,8 @@ def client():
 def auth_headers(db):
     def _get_headers(role: str):
         user = db.query(User).filter_by(role=role).first()
-        token = create_access_token(data={"sub": str(user.id), "email": user.email, "name": user.full_name, "role": user.role})
+        token = create_access_token(data={"sub": str(user.id), "email": user.email, "name": user.full_name,
+                                         "role": user.role,
+                                         "org_id": str(user.organisation_id) if user.organisation_id else None})
         return {"Authorization": f"Bearer {token}"}
     return _get_headers

@@ -65,6 +65,11 @@ class PilotStartRequest(BaseModel):
     reason: str = Field(min_length=5)
 
 
+class AgreementTemplateRequest(BaseModel):
+    template_key: str = Field(default='standard-pilot', min_length=2, max_length=80, pattern=r'^[a-zA-Z0-9][a-zA-Z0-9._-]*$')
+    clauses: dict[str, str]
+
+
 def _version_dict(version: AgreementVersion) -> dict:
     return {
         'id': str(version.id), 'agreement_id': version.agreement_id, 'version': version.version,
@@ -171,9 +176,9 @@ def list_agreement_templates(db: Session = Depends(get_db), current_user: OIDCUs
 
 
 @router.post('/templates', tags=['Officer'])
-def publish_agreement_template(payload: dict, db: Session = Depends(get_db), current_user: OIDCUserInfo = Depends(require('officer', 'pilot.approve'))):
-    key = str(payload.get('template_key', 'standard-pilot'))
-    clauses = payload.get('clauses', {})
+def publish_agreement_template(payload: AgreementTemplateRequest, db: Session = Depends(get_db), current_user: OIDCUserInfo = Depends(require('officer', 'pilot.approve'))):
+    key = payload.template_key
+    clauses = payload.clauses
     if any(not clauses.get(clause, '').strip() for clause in CLAUSE_KEYS):
         raise HTTPException(status_code=422, detail='Template must include every required clause.')
     latest = db.scalar(select(AgreementTemplate).where(AgreementTemplate.template_key == key).order_by(AgreementTemplate.version.desc()))
@@ -292,8 +297,8 @@ def approve_agreement(agreement_id: str, db: Session = Depends(get_db), current_
         raise HTTPException(status_code=404, detail='Agreement not found.')
     if agreement.status not in {'Draft', 'Approved'}:
         raise HTTPException(status_code=409, detail='Only a draft agreement can be approved.')
-    if current_user.role not in {'officer', 'validator', 'finance'}:
-        raise HTTPException(status_code=403, detail='Only named officer, validator, or finance approvers may approve agreements.')
+    from app.core.permissions import enforce_action
+    enforce_action(current_user, 'agreement.approve.named')
     chain = deepcopy(agreement.approval_chain or [])
     matching = next((item for item in chain if item['user_id'] == current_user.sub), None)
     if matching is None or matching['role'] != current_user.role:

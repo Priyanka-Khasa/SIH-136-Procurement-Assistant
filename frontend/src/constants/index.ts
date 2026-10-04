@@ -66,14 +66,14 @@ export const evidenceTableRows = [
   {
     id: 'EV-1042',
     status: 'Verified' as StatusType,
-    source: 'Startup India',
+    source: 'Simulated · Startup India',
     lastUpdated: '2h ago',
     reason: 'Baseline matched procurement brief',
   },
   {
     id: 'EV-1044',
     status: 'Needs Verification' as StatusType,
-    source: 'GeM',
+    source: 'Simulated · GeM',
     lastUpdated: '4h ago',
     reason: 'Invoice linked but route not confirmed',
   },

@@ -77,6 +77,7 @@ app.include_router(passport_router)
 
 @app.on_event("startup")
 def create_database_tables() -> None:
+    settings.validate_runtime_configuration()
     if settings.app_env != "test":
         if engine.dialect.name == 'sqlite':
             for table in Base.metadata.tables.values():
@@ -124,6 +125,8 @@ def create_database_tables() -> None:
 
 
 def seed_demo_accounts() -> None:
+    if not settings.is_local:
+        raise RuntimeError('Synthetic demo accounts may only be seeded in local development.')
     """Ensure the documented demo credentials work in a fresh local install."""
     accounts = [
         ('officer', 'Officer', 'officer@pilotproof.dev', 'Officer Priya Sharma', 'MSInS Demo Department', 'department'),

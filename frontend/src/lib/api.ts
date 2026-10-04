@@ -1,3 +1,5 @@
+import { isLocalDemoToken, isReadOnlyDemoRequest, maySendBearerTokenToBackend } from './demoMode';
+
 export const API_URL = import.meta.env.VITE_API_URL || '';
 
 const demoData = {
@@ -19,11 +21,15 @@ function encodeTokenPart(value: unknown): string {
 }
 
 function isLocalDemo(): boolean {
-  return window.localStorage.getItem('pilotproof-token')?.endsWith('.local-demo') === true;
+  return isLocalDemoToken(window.localStorage.getItem('pilotproof-token'));
 }
 
 function offlineDemoFetch(path: string, init: RequestInit): Response | null {
   if (!isLocalDemo()) return null;
+  // Never pretend a write reached durable storage. Demo mode is read-only.
+  if (!isReadOnlyDemoRequest(init.method)) {
+    return response({ detail: 'Synthetic offline demo only: this action was not sent to or saved by the backend.' }, 501);
+  }
   const route = path.split('?')[0];
   if (route === '/api/health') return response({ status: 'ok', service: 'pilotproof-local-demo' });
   if (route === '/api/challenges' || route.startsWith('/api/challenges/')) return response(route.endsWith('/versions') ? [{ version: 1, ...demoData.challenge }] : [demoData.challenge]);
@@ -42,12 +48,12 @@ function offlineDemoFetch(path: string, init: RequestInit): Response | null {
   if (route.startsWith('/api/evaluations/')) return response(route.includes('committee') ? { items: [], decisions: [], challenge_id: 'MH-MUNI-SC-001' } : route.includes('rubric') ? { version: 1, criteria: [] } : []);
   if (route === '/api/discovery/eligibility/me') return response({ items: [], startup: null, synthetic: true });
   if (route.startsWith('/api/discovery/startups/') && init.method === 'POST') return response({ detail: 'Uploads are disabled in local demo mode.' }, 501);
-  return null;
+  return response({ detail: 'This screen is unavailable in the synthetic offline demo. No backend request was made.' }, 503);
 }
 
 export function authHeaders(): HeadersInit {
   const token = window.localStorage.getItem('pilotproof-token');
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  return maySendBearerTokenToBackend(token) ? { Authorization: `Bearer ${token}` } : {};
 }
 
 export async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
@@ -77,15 +83,13 @@ export async function apiFetch(path: string, init: RequestInit = {}): Promise<Re
   }
 
   if (isLocalDemo()) {
-    const demo = offlineDemoFetch(path, init);
-    if (demo) return demo;
+    return offlineDemoFetch(path, init)!;
   }
 
   const headers = new Headers(authHeaders());
   new Headers(init.headers).forEach((value, key) => headers.set(key, value));
   try {
     const live = await fetch(`${API_URL}${path}`, { ...init, headers });
-    if (!live.ok && isLocalDemo()) return offlineDemoFetch(path, init) ?? live;
     return live;
   } catch (error) {
     const demo = offlineDemoFetch(path, init);

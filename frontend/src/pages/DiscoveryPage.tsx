@@ -91,7 +91,7 @@ export default function DiscoveryPage() {
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.detail || 'Manual-verification upload failed.');
-      setUploadMessage(`${result.filename} · ${result.status} · SHA-256 ${result.sha256}`);
+      setUploadMessage(`Simulated ${result.source_adapter} adapter · ${result.adapter_status} · ${result.filename} stored for human review · SHA-256 ${result.sha256}`);
       setUploadFile(null);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Manual-verification upload failed.');

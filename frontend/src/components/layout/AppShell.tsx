@@ -3,10 +3,12 @@ import { Sidebar } from './Sidebar';
 import { Bell, Search, Command } from 'lucide-react';
 import { CommandPalette } from '../ui/CommandPalette';
 import { Outlet } from 'react-router-dom';
+import { isLocalDemoToken } from '../../lib/demoMode';
 
 export const AppShell: React.FC = () => {
   const [collapsed, setCollapsed] = useState(false);
   const [cmdOpen, setCmdOpen] = useState(false);
+  const syntheticOffline = isLocalDemoToken(window.localStorage.getItem('pilotproof-token'));
 
   React.useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -52,6 +54,7 @@ export const AppShell: React.FC = () => {
           </div>
         </header>
         
+        {syntheticOffline && <div role='status' className='shrink-0 border-b border-amber-300 bg-amber-50 px-6 py-2 text-center text-xs font-medium text-amber-950'>Synthetic offline demo · actions are not saved to the backend</div>}
         <main className='flex-1 overflow-auto'>
           <Outlet />
         </main>

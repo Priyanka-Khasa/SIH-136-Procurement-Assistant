@@ -177,7 +177,7 @@ def _evaluate(source: dict, receiving: dict, included: dict[str, bool] | None = 
 
 
 @router.get('/districts')
-def list_districts(db: Session = Depends(get_db), current_user: OIDCUserInfo = Depends(get_current_user)):
+def list_districts(db: Session = Depends(get_db), current_user: OIDCUserInfo = Depends(require('transfer.assess'))):
     items = db.scalars(select(DistrictProfile).order_by(DistrictProfile.name)).all()
     if not items:
         item = DistrictProfile(name='Gadchiroli', district_type='Rural', daily_case_volume=120,

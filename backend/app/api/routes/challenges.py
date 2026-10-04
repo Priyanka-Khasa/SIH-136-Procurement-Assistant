@@ -156,7 +156,7 @@ def update_challenge_version(challenge_id: str, version_number: int, data: Measu
 
 
 @router.get('/{challenge_id}/versions')
-def list_challenge_versions(challenge_id: str, db: Session = Depends(get_db), current_user: OIDCUserInfo = Depends(get_current_user)):
+def list_challenge_versions(challenge_id: str, db: Session = Depends(get_db), current_user: OIDCUserInfo = Depends(require('challenge.read'))):
     versions = db.query(ChallengeVersion).filter_by(challenge_id=challenge_id).order_by(ChallengeVersion.version.asc()).all()
     payload = [_version_payload(version) for version in versions]
     challenge = db.query(Challenge).filter(Challenge.id == challenge_id).first()

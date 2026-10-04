@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.api.deps import get_current_user
-from app.core.permissions import require
+from app.core.permissions import LIFECYCLE_TRANSITION_ACTIONS, enforce_action, require
 from app.core.security import OIDCUserInfo
 from app.models.pilot import PilotAgreement
 from app.workflow.engine import (
@@ -47,7 +47,7 @@ def post_pilot(pilot_id: str, db: Session = Depends(get_db), current_user: OIDCU
 
 
 @router.get('/pilots/{pilot_id}')
-def get_pilot(pilot_id: str, db: Session = Depends(get_db), current_user: OIDCUserInfo = Depends(get_current_user)) -> dict[str, str | int | bool]:
+def get_pilot(pilot_id: str, db: Session = Depends(get_db), current_user: OIDCUserInfo = Depends(require('pilot.read'))) -> dict[str, str | int | bool]:
     pilot = db.get(PilotRecord, pilot_id)
     if pilot is None:
         raise HTTPException(status_code=404, detail='Pilot not found.')
@@ -63,19 +63,10 @@ def get_pilot(pilot_id: str, db: Session = Depends(get_db), current_user: OIDCUs
 
 @router.post('/pilots/{pilot_id}/transition')
 def post_transition(pilot_id: str, request: TransitionRequest, db: Session = Depends(get_db), current_user: OIDCUserInfo = Depends(get_current_user)) -> dict[str, str]:
-    allowed_roles = {
-        'Published': {'officer'}, 'Applications Open': {'officer'}, 'Evaluating': {'officer', 'evaluator'},
-        'Shortlisted': {'officer', 'evaluator'}, 'Agreement Drafted': {'officer'},
-        'Agreement Approved': {'officer'}, 'Pilot Running': {'officer'}, 'Evidence Submitted': {'startup'},
-        'Validated': {'validator'}, 'Accepted': {'officer'}, 'Invoice Approved': {'finance'},
-        'Payment Initiated': {'finance'}, 'Payment Confirmed': {'finance'},
-        'Scale-up Review': {'officer', 'district'}, 'Decision Recorded': {'officer'},
-        'Disputed': {'officer', 'evaluator', 'validator', 'finance', 'startup', 'district'},
-        'Correction Requested': {'officer', 'evaluator', 'validator', 'finance', 'startup', 'district'},
-        'Terminated': {'officer'},
-    }
-    if current_user.role not in allowed_roles.get(request.target, set()):
-        raise HTTPException(status_code=403, detail=f"Role '{current_user.role}' cannot transition to '{request.target}'.")
+    action = LIFECYCLE_TRANSITION_ACTIONS.get(request.target)
+    if action is None:
+        raise HTTPException(status_code=422, detail='Unknown lifecycle target.')
+    enforce_action(current_user, action)
     if request.target in {'Validated', 'Accepted', 'Invoice Approved', 'Payment Initiated', 'Payment Confirmed'}:
         raise HTTPException(status_code=409, detail=f"{request.target} must be recorded through its dedicated evidence or finance endpoint.")
     if request.target == 'Pilot Running':
@@ -94,8 +85,7 @@ def post_transition(pilot_id: str, request: TransitionRequest, db: Session = Dep
 
 @router.post('/pilots/{pilot_id}/kpi')
 def post_kpi_change(pilot_id: str, request: KPIChangeRequest, db: Session = Depends(get_db), current_user: OIDCUserInfo = Depends(get_current_user)) -> dict[str, str | int]:
-    if current_user.role not in {'officer', 'evaluator'}:
-        raise HTTPException(status_code=403, detail='Only an officer or evaluator may revise KPI criteria.')
+    enforce_action(current_user, 'pilot.revise_kpi')
     try:
         pilot = update_kpi(db, pilot_id, actor=current_user.sub, role=current_user.role, reason=request.reason)
     except LifecycleError as error:

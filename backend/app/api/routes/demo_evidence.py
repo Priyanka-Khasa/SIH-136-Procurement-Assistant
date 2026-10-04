@@ -25,5 +25,5 @@ def download_demo_csv(dataset_name: str):
     return Response(
         content=csv_content,
         media_type="text/csv",
-        headers={"Content-Disposition": f"attachment; filename={dataset_name}.csv"},
+        headers={"Content-Disposition": f"attachment; filename=synthetic-{dataset_name}.csv", "X-PilotProof-Demo": "true"},
     )

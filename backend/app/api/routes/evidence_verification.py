@@ -14,7 +14,6 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
 from app.core.audit_helper import write_audit_event
 from app.core.permissions import require
 from app.core.security import OIDCUserInfo
@@ -28,6 +27,7 @@ from app.models.evidence_verification import (
     EvidenceReviewThread,
 )
 from app.models.pilot import Milestone, AgreementVersion, PilotAgreement
+from app.models.startup import Startup
 from app.services.evidence_engine import (
     compute_sha256,
     generate_demo_datasets,
@@ -46,11 +46,25 @@ router = APIRouter()
 # Resolve upload directory relative to this file's location
 _BACKEND_ROOT = Path(__file__).resolve().parents[3]  # …/backend
 _UPLOAD_DIR = _BACKEND_ROOT / "uploads" / "evidence"
+_MAX_EVIDENCE_BYTES = 10 * 1024 * 1024
+_MAX_EVIDENCE_ROWS = 100_000
 
 
 def _ensure_upload_dir() -> Path:
     _UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     return _UPLOAD_DIR
+
+
+def _load_upload_for_user(db: Session, upload_id: str, current_user: OIDCUserInfo) -> EvidenceUpload:
+    ev = db.get(EvidenceUpload, upload_id)
+    if ev is None:
+        raise HTTPException(404, detail="Upload not found.")
+    if current_user.role == 'startup':
+        agreement = db.get(PilotAgreement, ev.pilot_agreement_id)
+        startup = db.get(Startup, agreement.startup_id) if agreement else None
+        if not current_user.org_id or not startup or str(startup.organisation_id) != current_user.org_id:
+            raise HTTPException(403, detail="Startup users may only access evidence for their own organization.")
+    return ev
 
 
 def _build_analysis_response(
@@ -163,11 +177,18 @@ async def upload_evidence(
         raise HTTPException(400, detail="agreement_id is required.")
     if not file.filename or not file.filename.lower().endswith((".csv", ".txt")):
         raise HTTPException(400, detail="Upload a CSV evidence file.")
-    if db.get(PilotAgreement, pilot_agreement_id) is None:
+    agreement = db.get(PilotAgreement, pilot_agreement_id)
+    if agreement is None:
         raise HTTPException(404, detail="Pilot agreement not found.")
+    if current_user.role == 'startup':
+        startup = db.get(Startup, agreement.startup_id)
+        if not current_user.org_id or not startup or str(startup.organisation_id) != current_user.org_id:
+            raise HTTPException(403, detail="Startup users may only upload evidence for their own organization.")
 
     # ── Read file ──────────────────────────────────────────────────────────
-    raw_bytes = await file.read()
+    raw_bytes = await file.read(_MAX_EVIDENCE_BYTES + 1)
+    if len(raw_bytes) > _MAX_EVIDENCE_BYTES:
+        raise HTTPException(413, detail="Evidence CSV files must be 10 MiB or smaller.")
     file_obj = io.BytesIO(raw_bytes)
     sha256_hash = compute_sha256(file_obj)
     file_size = len(raw_bytes)
@@ -182,10 +203,12 @@ async def upload_evidence(
     row_count = len(df)
     if row_count == 0:
         raise HTTPException(400, detail="CSV contains no data rows.")
+    if row_count > _MAX_EVIDENCE_ROWS:
+        raise HTTPException(413, detail="Evidence CSV files may contain no more than 100,000 data rows.")
 
     # ── Save to disk ───────────────────────────────────────────────────────
     upload_id = str(uuid4())
-    safe_name = Path(file.filename or "upload.csv").name
+    safe_name = Path((file.filename or "upload.csv").replace('\\', '/')).name.replace('\x00', '')[:180]
     dest_path = _ensure_upload_dir() / f"{upload_id}_{safe_name}"
     dest_path.write_bytes(raw_bytes)
 
@@ -360,12 +383,10 @@ async def upload_evidence(
 def get_evidence(
     upload_id: str,
     db: Session = Depends(get_db),
-    current_user: OIDCUserInfo = Depends(get_current_user),
+    current_user: OIDCUserInfo = Depends(require("evidence.view")),
 ):
     """Return upload metadata, findings, and KPI results for an upload."""
-    ev = db.get(EvidenceUpload, upload_id)
-    if ev is None:
-        raise HTTPException(404, detail="Upload not found.")
+    ev = _load_upload_for_user(db, upload_id, current_user)
 
     findings = (
         db.query(QualityFinding)
@@ -468,12 +489,10 @@ def get_evidence(
 def get_evidence_rows(
     upload_id: str,
     db: Session = Depends(get_db),
-    current_user: OIDCUserInfo = Depends(get_current_user),
+    current_user: OIDCUserInfo = Depends(require("evidence.view")),
 ):
     """Return the raw CSV rows as JSON, with per-row flagging metadata."""
-    ev = db.get(EvidenceUpload, upload_id)
-    if ev is None:
-        raise HTTPException(404, detail="Upload not found.")
+    ev = _load_upload_for_user(db, upload_id, current_user)
 
     file_path = Path(ev.file_path)
     if not file_path.exists():
@@ -701,12 +720,10 @@ def get_demo_analysis(dataset_name: str):
 def reproduce_kpis(
     upload_id: str,
     db: Session = Depends(get_db),
-    current_user: OIDCUserInfo = Depends(get_current_user),
+    current_user: OIDCUserInfo = Depends(require("evidence.view")),
 ):
     """Return the exact calculation steps and Python code for every KPI in an upload."""
-    ev = db.get(EvidenceUpload, upload_id)
-    if ev is None:
-        raise HTTPException(404, detail="Upload not found.")
+    ev = _load_upload_for_user(db, upload_id, current_user)
 
     kpis = (
         db.query(KPIResult2)

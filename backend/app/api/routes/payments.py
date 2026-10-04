@@ -15,6 +15,8 @@ from app.core.security import OIDCUserInfo
 from app.db.session import get_db
 from app.models.evidence_verification import EvidenceUpload, EvidenceVersion2, KPIResult2, ValidatorDecision
 from app.models.pilot import Milestone
+from app.models.pilot import PilotAgreement
+from app.models.startup import Startup
 from app.models.payment import Invoice, PaymentRecord
 
 router = APIRouter(tags=['Finance'])
@@ -30,6 +32,13 @@ def _milestone(db: Session, milestone_id: str) -> Milestone:
     if item is None:
         raise HTTPException(404, detail='Milestone not found.')
     return item
+
+
+def _require_milestone_startup_access(db: Session, item: Milestone, current_user: OIDCUserInfo) -> None:
+    agreement = db.get(PilotAgreement, item.agreement_id)
+    startup = db.get(Startup, agreement.startup_id) if agreement else None
+    if current_user.role != 'startup' or not current_user.org_id or not startup or str(startup.organisation_id) != current_user.org_id:
+        raise HTTPException(status_code=403, detail='Startup users may only submit invoices for their own organization milestones.')
 
 
 def _latest_accepted_upload(db: Session, agreement_id: str):
@@ -64,21 +73,25 @@ def accept_milestone_evidence(id: str, db: Session = Depends(get_db), current_us
 
 
 @router.post('/{id}/invoice', tags=['Startup Applicant'])
-async def submit_invoice(id: str, amount: int = Form(...), reference: str = Form(''), file: UploadFile = File(...),
+async def submit_invoice(id: str, amount: int = Form(...), reference: str = Form('', max_length=100), file: UploadFile = File(...),
                          db: Session = Depends(get_db), current_user: OIDCUserInfo = Depends(require('milestone.submit_invoice'))):
     item = _milestone(db, id)
+    _require_milestone_startup_access(db, item, current_user)
     if item.lifecycle_state != 'Accepted':
         raise HTTPException(409, detail='A milestone invoice can be submitted only after its evidence is accepted.')
     if amount <= 0:
         raise HTTPException(422, detail='Invoice amount must be greater than zero.')
+    if amount > item.amount:
+        raise HTTPException(422, detail='Invoice amount cannot exceed the sanctioned milestone amount.')
     if not file.filename or not file.filename.lower().endswith(('.pdf', '.png', '.jpg', '.jpeg')):
         raise HTTPException(400, detail='Upload an invoice as PDF or image.')
-    raw = await file.read()
+    raw = await file.read(10 * 1024 * 1024 + 1)
     if not raw or len(raw) > 10 * 1024 * 1024:
-        raise HTTPException(400, detail='Invoice file must be between 1 byte and 10 MB.')
+        raise HTTPException(413 if raw else 400, detail='Invoice file must be between 1 byte and 10 MB.')
     _INVOICE_DIR.mkdir(parents=True, exist_ok=True)
     invoice_id = uuid4()
-    target = _INVOICE_DIR / f'{invoice_id}_{Path(file.filename).name}'
+    safe_filename = Path((file.filename or 'invoice').replace('\\', '/')).name.replace('\x00', '')[:180]
+    target = _INVOICE_DIR / f'{invoice_id}_{safe_filename}'
     target.write_bytes(raw)
     record = Invoice(id=invoice_id, milestone_id=UUID(id), submitted_by=UUID(current_user.sub), amount=amount,
                      reference=reference.strip() or None, storage_path=str(target),
