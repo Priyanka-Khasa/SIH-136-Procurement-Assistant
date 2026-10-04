@@ -27,10 +27,16 @@ MEASUREMENT_PLAN: dict = {
     "max_bandwidth_mbps": 2.0,
     "min_total_observations": 100,
     "min_low_bandwidth_success_pct": 80.0,
+    "min_segment_samples": 30,
+    "capacity_per_day": 100,
+    "min_low_bandwidth_samples": 10,
 }
 
+# Bump when the calculation contract changes so a later upload is comparable
+# only to results produced by the same engine definition.
+CALCULATOR_VERSION = "evidence-engine-v2"
+
 REQUIRED_COLUMNS: list[str] = [
-    "case_id",
     "language",
     "processing_time_before",
     "processing_time_after",
@@ -68,6 +74,7 @@ def run_quality_checks(
     prev_df: pd.DataFrame | None = None,
     previous_metric_definition_hash: str | None = None,
     metric_definition_hash: str | None = None,
+    measurement_plan: dict | None = None,
 ) -> list[dict]:
     """Run all data-quality checks and return a list of finding dicts.
 
@@ -75,19 +82,31 @@ def run_quality_checks(
     row_indices (list of int 0-based positions into *df*).
     """
     findings: list[dict] = []
+    plan = {**MEASUREMENT_PLAN, **(measurement_plan or {})}
+
+    missing_columns = sorted(set(REQUIRED_COLUMNS) - set(df.columns))
+    if missing_columns:
+        findings.append({
+            "severity": "critical",
+            "check_name": "missing_required_columns",
+            "rows_affected": len(df),
+            "explanation": f"Required evidence columns are missing: {', '.join(missing_columns)}.",
+            "row_indices": df.index.tolist(),
+        })
 
     # 1. missing_periods ---------------------------------------------------
     # Check whether 'period' column has gaps (e.g. weeks 1, 2, 4 but not 3).
     if "period" in df.columns:
         numeric_periods = pd.to_numeric(df["period"], errors="coerce")
         periods = numeric_periods.dropna().unique()
-        if len(periods) > 0:
-            min_p = int(min(periods))
-            max_p = int(max(periods))
-            expected = set(range(min_p, max_p + 1))
-            present = {int(p) for p in periods if float(p).is_integer()}
+        whole_periods = [int(p) for p in periods if float(p).is_integer()]
+        if len(whole_periods) > 0:
+            min_p = min(whole_periods) if whole_periods else 0
+            max_p = max(whole_periods) if whole_periods else -1
+            expected = set(range(min_p, max_p + 1)) if whole_periods else set()
+            present = set(whole_periods)
             missing_periods = sorted(expected - present)
-            missing_period_rows = df[numeric_periods.isna()].index.tolist()
+            missing_period_rows = df[(numeric_periods.isna() | (numeric_periods % 1 != 0))].index.tolist()
             if missing_periods or missing_period_rows:
                 findings.append(
                     {
@@ -97,11 +116,14 @@ def run_quality_checks(
                         "explanation": (
                             f"Period column has gaps: periods {missing_periods} are absent "
                             f"from the data (range {min_p}–{max_p}).  "
-                            f"{len(missing_period_rows)} rows have a null period value."
+                            f"{len(missing_period_rows)} rows have a null or invalid period value."
                         ),
                         "row_indices": missing_period_rows,
                     }
                 )
+        elif len(df):
+            findings.append({"severity": "major", "check_name": "missing_periods", "rows_affected": len(df),
+                "explanation": "No valid integer periods were provided.", "row_indices": df.index.tolist()})
 
     # 2. duplicate_rows ----------------------------------------------------
     if "case_id" in df.columns and "period" in df.columns:
@@ -123,12 +145,9 @@ def run_quality_checks(
 
     # 3. unsupported_denominators ------------------------------------------
     invalid_mask = pd.Series(False, index=df.index)
-    if "processing_time_before" in df.columns:
-        baseline = pd.to_numeric(df["processing_time_before"], errors="coerce")
-        invalid_mask |= baseline.isna() | (baseline <= 0)
-    if "processing_time_after" in df.columns:
-        after = pd.to_numeric(df["processing_time_after"], errors="coerce")
-        invalid_mask |= after.isna() | (after <= 0)
+    baseline = pd.to_numeric(df["processing_time_before"], errors="coerce") if "processing_time_before" in df.columns else pd.Series(float('nan'), index=df.index)
+    after = pd.to_numeric(df["processing_time_after"], errors="coerce") if "processing_time_after" in df.columns else pd.Series(float('nan'), index=df.index)
+    invalid_mask |= baseline.isna() | (baseline <= 0) | after.isna() | (after <= 0)
     invalid_indices = df[invalid_mask].index.tolist()
     if invalid_indices:
         findings.append(
@@ -197,11 +216,23 @@ def run_quality_checks(
                 }
             )
 
+    min_total = max(1, int(plan.get("min_total_observations", 100)))
+    if len(df) < min_total:
+        findings.append({
+            "severity": "major",
+            "check_name": "sample_size_adequacy",
+            "rows_affected": len(df),
+            "explanation": f"The evidence set has {len(df)} attempted rows; the locked minimum is {min_total}.",
+            "row_indices": df.index.tolist(),
+        })
+
     # 6. sample_size_adequacy ----------------------------------------------
     if "language" in df.columns:
-        MIN_SEGMENT = 30
+        default_segment_min = max(1, int(plan.get("min_segment_samples", 30)))
+        marathi_min = max(1, int(plan.get("min_marathi_samples", 30)))
         for lang, group in df.groupby("language"):
-            if len(group) < MIN_SEGMENT:
+            segment_min = marathi_min if str(lang).strip().casefold() == 'marathi' else default_segment_min
+            if len(group) < segment_min:
                 findings.append(
                     {
                         "severity": "major",
@@ -209,7 +240,7 @@ def run_quality_checks(
                         "rows_affected": len(group),
                         "explanation": (
                             f"Language segment '{lang}' has only {len(group)} rows, "
-                            f"below the minimum of {MIN_SEGMENT} required for statistical validity."
+                            f"below the minimum of {segment_min} required for statistical validity."
                         ),
                         "row_indices": group.index.tolist(),
                     }
@@ -217,12 +248,21 @@ def run_quality_checks(
 
     # 7. outliers ----------------------------------------------------------
     if "processing_time_after" in df.columns:
-        col = df["processing_time_after"].dropna()
-        if len(col) >= 3:
+        numeric_after = pd.to_numeric(df["processing_time_after"], errors="coerce")
+        col = numeric_after.dropna()
+        invalid_denominators = numeric_after.isna() | (numeric_after <= 0)
+        if invalid_denominators.any():
+            findings.append({"severity": "critical", "check_name": "unsupported_denominators",
+                "rows_affected": int(invalid_denominators.sum()),
+                "explanation": "Processing-time denominator values are missing, non-numeric, or non-positive.",
+                "row_indices": df[invalid_denominators].index.tolist()})
+        if len(col) >= 3 and (col.max() > (col.mean() + 3 * col.std()) or (len(col) < 30 and col.max() > col.quantile(0.75) * 1.25)):
             mean_val = col.mean()
             std_val = col.std()
             threshold_val = mean_val + 3 * std_val
-            outlier_mask = df["processing_time_after"] > threshold_val
+            outlier_mask = numeric_after > threshold_val
+            if len(col) < 30:
+                outlier_mask |= numeric_after > col.quantile(0.75) * 1.25
             outlier_indices = df[outlier_mask].index.tolist()
             if outlier_indices:
                 findings.append(
@@ -281,27 +321,44 @@ def recalculate_kpis(df: pd.DataFrame, claimed: dict, measurement_plan: dict | N
     results: list[dict] = []
     plan = {**MEASUREMENT_PLAN, **(measurement_plan or {})}
 
+    def valid_sample(columns: tuple[str, ...], minimum: int = 1) -> tuple[bool, str]:
+        missing = [column for column in columns if column not in df.columns]
+        if missing:
+            return False, f"Required evidence columns are missing: {', '.join(missing)}."
+        if len(df) < minimum:
+            return False, f"Only {len(df)} attempted rows; the locked minimum is {minimum}."
+        return True, ""
+
     # ── 1. Median processing-time reduction ──────────────────────────────
     target_pct = plan["target_reduction_pct"]
-    baseline_median = float(df["processing_time_before"].median()) if "processing_time_before" in df.columns else 0.0
-    after_median = float(df["processing_time_after"].median()) if "processing_time_after" in df.columns else 0.0
-    if baseline_median > 0:
+    min_total = max(1, int(plan.get("min_total_observations", 100)))
+    calculation_minimum = 1 if measurement_plan is None else min_total
+    ok_reduction, reason_reduction = valid_sample(("processing_time_before", "processing_time_after"), calculation_minimum)
+    baseline_values = pd.to_numeric(df.get("processing_time_before", pd.Series(dtype=float)), errors="coerce")
+    after_values = pd.to_numeric(df.get("processing_time_after", pd.Series(dtype=float)), errors="coerce")
+    ok_reduction = ok_reduction and bool(baseline_values.notna().all() and after_values.notna().all()) and bool((baseline_values > 0).all())
+    if not ok_reduction and not reason_reduction:
+        reason_reduction = "Processing-time values must be numeric and baseline values must be positive."
+    baseline_median = float(baseline_values.median()) if len(baseline_values) and baseline_values.notna().all() else 0.0
+    after_median = float(after_values.median()) if len(after_values) and after_values.notna().all() else 0.0
+    if baseline_median > 0 and ok_reduction:
         recomputed_reduction = ((baseline_median - after_median) / baseline_median) * 100.0
     else:
-        recomputed_reduction = 0.0
+        recomputed_reduction = None
     n_rows_reduction = len(df)
     claimed_reduction = claimed.get("reduction_pct")
     delta_reduction = (
         round(recomputed_reduction - claimed_reduction, 4)
-        if claimed_reduction is not None
+        if claimed_reduction is not None and recomputed_reduction is not None
         else None
     )
-    outcome_reduction = "passed" if recomputed_reduction >= target_pct else "failed"
+    outcome_reduction = ("passed" if recomputed_reduction >= target_pct else "failed") if recomputed_reduction is not None else "missing_evidence"
+    reduction_display = recomputed_reduction if recomputed_reduction is not None else 0.0
     explanation_reduction = (
         f"Recomputed median reduction is {recomputed_reduction:.2f} % "
         f"(baseline median={baseline_median:.2f} min, after median={after_median:.2f} min, "
-            f"using all {n_rows_reduction} attempted rows, including failed cases). "
-        f"Required ≥ {target_pct} %.  "
+        f"using all {n_rows_reduction} attempted rows, including failed cases). Required ≥ {target_pct} %."
+        if recomputed_reduction is not None else f"Reduction is missing evidence: {reason_reduction}"
     )
     if claimed_reduction is not None:
         explanation_reduction += (
@@ -313,15 +370,15 @@ def recalculate_kpis(df: pd.DataFrame, claimed: dict, measurement_plan: dict | N
         f"Step 3: Compute after_median = df['processing_time_after'].median() → {after_median:.4f} min.",
         f"Step 4: reduction = ((baseline_median - after_median) / baseline_median) × 100 "
         f"= (({baseline_median:.4f} - {after_median:.4f}) / {baseline_median:.4f}) × 100 "
-        f"= {recomputed_reduction:.4f} %.",
-        f"Step 5: Compare {recomputed_reduction:.4f} % vs threshold {target_pct} % → {outcome_reduction.upper()}.",
+        f"= {reduction_display:.4f} %." if recomputed_reduction is not None else "Step 4: Calculation cannot be completed from this evidence.",
+        f"Step 5: Compare {reduction_display:.4f} % vs threshold {target_pct} % → {outcome_reduction.upper()}.",
     ]
     results.append(
         {
             "kpi_key": "reduction_pct",
             "kpi_label": "Median Processing Time Reduction",
             "claimed_value": claimed_reduction,
-            "recomputed_value": round(recomputed_reduction, 4),
+            "recomputed_value": round(recomputed_reduction, 4) if recomputed_reduction is not None else None,
             "delta": delta_reduction,
             "outcome": outcome_reduction,
             "unit": "%",
@@ -335,34 +392,40 @@ def recalculate_kpis(df: pd.DataFrame, claimed: dict, measurement_plan: dict | N
 
     # ── 2. Error rate ─────────────────────────────────────────────────────
     max_error = plan["max_error_rate_pct"]
+    ok_error, reason_error = valid_sample(("error_flag",), calculation_minimum)
+    error_values = pd.to_numeric(df.get("error_flag", pd.Series(dtype=float)), errors="coerce")
+    ok_error = ok_error and bool(error_values.notna().all() and error_values.isin([0, 1]).all())
     if "error_flag" in df.columns:
-        n_errors = int(df["error_flag"].sum())
-        recomputed_error = (n_errors / len(df)) * 100.0 if len(df) else 0.0
+        n_errors = int(error_values.fillna(0).sum())
+        recomputed_error = (n_errors / len(df)) * 100.0 if len(df) and ok_error else None
     else:
         n_errors = 0
-        recomputed_error = 0.0
+        recomputed_error = None
+    if not ok_error and not reason_error:
+        reason_error = "Error flags must be numeric 0/1 values."
     claimed_error = claimed.get("error_rate_pct")
     delta_error = (
-        round(recomputed_error - claimed_error, 4) if claimed_error is not None else None
+        round(recomputed_error - claimed_error, 4) if claimed_error is not None and recomputed_error is not None else None
     )
-    outcome_error = "passed" if recomputed_error <= max_error else "failed"
+    outcome_error = ("passed" if recomputed_error <= max_error else "failed") if recomputed_error is not None else "missing_evidence"
+    error_display = recomputed_error if recomputed_error is not None else 0.0
     explanation_error = (
-        f"Error rate is {recomputed_error:.2f} % ({n_errors} errors / {len(df)} rows). "
-        f"Required ≤ {max_error} %.  "
+        f"Error rate is {recomputed_error:.2f} % ({n_errors} errors / {len(df)} rows). Required ≤ {max_error} %."
+        if recomputed_error is not None else f"Error-rate KPI is missing evidence: {reason_error}"
     )
     if claimed_error is not None:
         explanation_error += f"Startup claimed {claimed_error:.1f} %; delta={delta_error:+.2f} pp."
     steps_error = [
         f"Step 1: Sum error_flag column → {n_errors} flagged rows.",
-        f"Step 2: Divide by total rows {len(df)} → {n_errors}/{len(df)} = {recomputed_error:.4f} %.",
-        f"Step 3: Compare {recomputed_error:.4f} % vs threshold ≤ {max_error} % → {outcome_error.upper()}.",
+        f"Step 2: Divide by total rows {len(df)} → {n_errors}/{len(df)} = {error_display:.4f} %.",
+        f"Step 3: Compare {error_display:.4f} % vs threshold ≤ {max_error} % → {outcome_error.upper()}.",
     ]
     results.append(
         {
             "kpi_key": "error_rate_pct",
             "kpi_label": "Error Rate",
             "claimed_value": claimed_error,
-            "recomputed_value": round(recomputed_error, 4),
+            "recomputed_value": round(recomputed_error, 4) if recomputed_error is not None else None,
             "delta": delta_error,
             "outcome": outcome_error,
             "unit": "%",
@@ -379,7 +442,7 @@ def recalculate_kpis(df: pd.DataFrame, claimed: dict, measurement_plan: dict | N
     min_samples = plan["min_marathi_samples"]
     claimed_marathi = claimed.get("marathi_accuracy_pct")
     if "language" in df.columns and "outcome" in df.columns:
-        marathi_df = df[df["language"] == "Marathi"]
+        marathi_df = df[df["language"].astype(str).str.strip().str.casefold() == "marathi"]
         n_marathi = len(marathi_df)
         if n_marathi < min_samples:
             outcome_marathi = "missing_evidence"
@@ -395,7 +458,7 @@ def recalculate_kpis(df: pd.DataFrame, claimed: dict, measurement_plan: dict | N
             ]
             rows_used_marathi = n_marathi
         else:
-            n_marathi_success = int(marathi_df[marathi_df["outcome"] == "success"].shape[0])
+            n_marathi_success = int(marathi_df[marathi_df["outcome"].astype(str).str.casefold() == "success"].shape[0])
             recomputed_marathi = (n_marathi_success / n_marathi) * 100.0
             delta_marathi = (
                 round(recomputed_marathi - claimed_marathi, 4)
@@ -448,20 +511,22 @@ def recalculate_kpis(df: pd.DataFrame, claimed: dict, measurement_plan: dict | N
     lb_threshold = plan["min_low_bandwidth_success_pct"]
     claimed_lb = claimed.get("low_bandwidth_pct")
     if "low_bandwidth" in df.columns and "outcome" in df.columns:
-        lb_df = df[df["low_bandwidth"] == True]  # noqa: E712 – pandas comparison
+        low_values = df["low_bandwidth"].map(lambda value: value if isinstance(value, bool) else str(value).strip().casefold() in {"true", "1", "yes", "y"})
+        lb_df = df[low_values]
         n_lb = len(lb_df)
-        if n_lb == 0:
+        lb_minimum = max(1, int(plan.get("min_low_bandwidth_samples", 1)))
+        if n_lb < lb_minimum:
             outcome_lb = "missing_evidence"
             recomputed_lb: float | None = None
             delta_lb = None
-            explanation_lb = "No low-bandwidth rows found in the dataset. Cannot compute KPI."
+            explanation_lb = f"Only {n_lb} low-bandwidth rows found; the locked minimum is {lb_minimum}. Cannot compute KPI."
             steps_lb = [
-                "Step 1: Filter low_bandwidth == True → 0 rows.",
-                "Step 2: 0 low-bandwidth observations → outcome=MISSING_EVIDENCE.",
+                f"Step 1: Filter low_bandwidth == True → {n_lb} rows.",
+                f"Step 2: {n_lb} low-bandwidth observations are below minimum {lb_minimum} → outcome=MISSING_EVIDENCE.",
             ]
-            rows_used_lb = 0
+            rows_used_lb = n_lb
         else:
-            n_lb_success = int(lb_df[lb_df["outcome"] == "success"].shape[0])
+            n_lb_success = int(lb_df[lb_df["outcome"].astype(str).str.casefold() == "success"].shape[0])
             recomputed_lb = (n_lb_success / n_lb) * 100.0
             delta_lb = (
                 round(recomputed_lb - claimed_lb, 4) if claimed_lb is not None else None

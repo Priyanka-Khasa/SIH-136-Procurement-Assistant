@@ -17,6 +17,9 @@ from app.workflow.engine import (
     verify_audit_chain,
 )
 from app.workflow.models import AuditEvent, PaymentAttempt, PilotRecord
+from app.core.audit_helper import verify_record_audit_chain, write_audit_event
+from app.models.audit import AuditEvent as RecordAuditEvent
+from app.core.permissions import LIFECYCLE_TRANSITION_ACTIONS, POLICY, enforce_action
 
 
 @pytest.fixture()
@@ -166,3 +169,43 @@ def test_audit_verify_endpoint_note(client):
     response = client.get('/api/audit/verify')
     assert response.status_code == 200
     assert response.json()['note'] == 'Hashes detect changes. They do not prove a measurement was truthful.'
+
+
+def test_policy_matrix_and_lifecycle_roles_are_explicit():
+    role_names = {'officer', 'startup', 'evaluator', 'validator', 'finance', 'district'}
+    assert set(LIFECYCLE_TRANSITION_ACTIONS.values()) <= set(POLICY)
+    for action, allowed in POLICY.items():
+        assert allowed <= role_names
+        for role in role_names:
+            user = OIDCUserInfo(sub='test-user', email='user@example.test', name='Test User', role=role)
+            if role in allowed:
+                enforce_action(user, action)
+            else:
+                with pytest.raises(Exception):
+                    enforce_action(user, action)
+
+
+def test_application_audit_hash_chain_detects_changes_and_keeps_rows_append_only(db_session):
+    write_audit_event(db_session, None, 'system', 'test.one', 'Test', '1', 'Original')
+    write_audit_event(db_session, None, 'system', 'test.two', 'Test', '2', 'Next')
+    assert verify_record_audit_chain(db_session).valid
+    event = db_session.query(RecordAuditEvent).order_by(RecordAuditEvent.occurred_at, RecordAuditEvent.id).first()
+    db_session.execute(text('DROP TRIGGER audit_no_update'))
+    event.detail = 'changed'
+    db_session.commit()
+    report = verify_record_audit_chain(db_session)
+    assert report.valid is False
+    assert report.checked_events == 0
+    assert report.first_broken_event_id == str(event.id)
+
+
+def test_application_audit_rows_reject_update_and_delete(db_session):
+    event = write_audit_event(db_session, None, 'system', 'test.one', 'Test', '1', 'Original')
+    with pytest.raises(Exception):
+        event.detail = 'overwrite'
+        db_session.commit()
+    db_session.rollback()
+    with pytest.raises(Exception):
+        db_session.delete(event)
+        db_session.commit()
+    db_session.rollback()

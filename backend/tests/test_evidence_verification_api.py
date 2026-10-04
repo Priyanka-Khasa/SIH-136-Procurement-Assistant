@@ -121,3 +121,38 @@ def test_latest_upload_endpoint_returns_flagged_rows_and_saved_calculation_code(
     assert any(row['_flagged'] for row in body['rows'])
     assert "df['processing_time_after'].median()" in body['kpi_results'][0]['python_code']
     assert body['overall_outcome'] == 'missing_evidence'
+
+
+def test_approving_changed_measurement_plan_marks_current_evidence_stale(client, evidence_fixture, auth_headers):
+    from app.services.evidence_invalidation import invalidate_current_evidence
+    from app.services.evidence_invalidation import measurement_plan_fingerprint, measurement_plan_for_version, comparable_measurement_plan
+
+    db, startup, validator, agreement, _ = evidence_fixture
+    uploaded = _upload(client, _headers(startup), agreement.id, 'corrected_resubmission')
+    assert uploaded.status_code == 200, uploaded.text
+    upload_id = uploaded.json()['upload_id']
+    accepted = client.post(f'/api/v2/evidence/{upload_id}/decision', headers=_headers(validator), json={'action': 'accepted'})
+    assert accepted.status_code == 200, accepted.text
+    previous_version = db.query(AgreementVersion).filter_by(agreement_id=agreement.id, version=1).one()
+    prior_fingerprint = measurement_plan_fingerprint(measurement_plan_for_version(previous_version))
+    evidence_version = db.query(EvidenceVersion2).filter_by(upload_id=upload_id).one()
+    # Exact same fingerprint is what upload persisted.
+    assert evidence_version.metric_definition_hash == prior_fingerprint
+    previous_version.approved = False
+    evidence_snapshot = dict(evidence_version.measurement_plan_snapshot)
+    evidence_snapshot.pop('calculator_version', None)
+    expected_previous = measurement_plan_fingerprint(evidence_snapshot)
+    assert expected_previous == evidence_version.metric_definition_hash
+    changed_version = AgreementVersion(agreement_id=agreement.id, version=2, baseline_minutes=45,
+        target_pct=40, error_limit_pct=5, marathi_accuracy_pct=85, min_observations=100,
+        min_marathi_observations=30, bandwidth_mbps=2, capacity_per_day=100,
+        start_date=date(2026, 1, 1), end_date=date(2026, 12, 31), revised_by=previous_version.revised_by,
+        approved=True)
+    db.add(changed_version)
+    db.flush()
+    assert measurement_plan_fingerprint(measurement_plan_for_version(changed_version)) != evidence_version.metric_definition_hash
+    invalidated = invalidate_current_evidence(db, agreement.id, reason='approved_measurement_plan_changed')
+    db.commit()
+    assert invalidated == 1
+    assert evidence_version.is_current is False
+    assert all(result.is_stale for result in db.query(KPIResult2).filter_by(upload_id=upload_id).all())

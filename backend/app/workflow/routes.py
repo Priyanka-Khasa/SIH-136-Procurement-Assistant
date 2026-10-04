@@ -8,6 +8,7 @@ from app.api.deps import get_current_user
 from app.core.permissions import LIFECYCLE_TRANSITION_ACTIONS, enforce_action, require
 from app.core.security import OIDCUserInfo
 from app.models.pilot import PilotAgreement
+from app.models.evidence_verification import EvidenceVersion2, KPIResult2
 from app.workflow.engine import (
     LIFECYCLE_STATES,
     LifecycleError,
@@ -18,6 +19,8 @@ from app.workflow.engine import (
     verify_audit_chain,
 )
 from app.workflow.models import AuditEvent, PaymentAttempt, PilotRecord
+from app.services.evidence_invalidation import invalidate_current_evidence
+from app.core.audit_helper import write_audit_event
 
 router = APIRouter(prefix='/api', tags=['Officer'])
 
@@ -90,7 +93,14 @@ def post_kpi_change(pilot_id: str, request: KPIChangeRequest, db: Session = Depe
         pilot = update_kpi(db, pilot_id, actor=current_user.sub, role=current_user.role, reason=request.reason)
     except LifecycleError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
-    return {'id': pilot.id, 'kpi_version': pilot.kpi_version, 'result_status': pilot.result_status}
+    agreement = db.get(PilotAgreement, pilot_id)
+    invalidated = invalidate_current_evidence(db, pilot_id, reason='workflow_kpi_changed') if agreement else 0
+    if invalidated:
+        db.commit()
+        write_audit_event(db, current_user.sub, current_user.role, 'evidence.results_invalidated', 'PilotAgreement', pilot_id,
+                          f'Workflow KPI inputs changed; {invalidated} evidence version(s) marked stale.')
+    return {'id': pilot.id, 'kpi_version': pilot.kpi_version, 'result_status': pilot.result_status,
+            'invalidated_evidence_versions': invalidated}
 
 
 @router.post('/pilots/{pilot_id}/payments', tags=['Finance'])

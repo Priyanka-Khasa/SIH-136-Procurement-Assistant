@@ -3,6 +3,7 @@ from uuid import UUID, uuid4
 
 from app.models.challenge import Challenge
 from app.models.evidence_verification import EvidenceUpload, EvidenceVersion2, KPIResult2, ValidatorDecision
+from app.services.evidence_invalidation import measurement_plan_fingerprint, measurement_plan_for_version
 from app.models.organisation import Organisation
 from app.models.payment import Invoice, PaymentRecord
 from app.models.pilot import AgreementVersion, Milestone, PilotAgreement
@@ -97,8 +98,10 @@ def test_invoice_and_payment_states_advance_only_in_order(client, db, auth_heade
         original_filename='accepted.csv', sha256_hash='a'*64, file_path='unused.csv', row_count=10,
         file_size_bytes=120, upload_status='ready')
     db.add(upload); db.flush()
+    agreement_version = db.query(AgreementVersion).filter_by(agreement_id=agreement.id).one()
     db.add(EvidenceVersion2(upload_id=upload_id, agreement_id=agreement.id, version_number=1,
-        sha256_hash='a'*64, is_current=True))
+        sha256_hash='a'*64, is_current=True,
+        metric_definition_hash=measurement_plan_fingerprint(measurement_plan_for_version(agreement_version))))
     db.add(KPIResult2(upload_id=upload_id, kpi_key='reduction_pct', kpi_label='Reduction', outcome='passed',
         unit='%', explanation='Synthetic passed result.'))
     db.add(ValidatorDecision(upload_id=upload_id, validator_id=str(validator.id), action='accepted'))
@@ -108,6 +111,17 @@ def test_invoice_and_payment_states_advance_only_in_order(client, db, auth_heade
     accepted = client.post(f'/api/milestones/{milestone.id}/accept-evidence', headers=auth_headers('officer'))
     assert accepted.status_code == 200, accepted.text
     assert accepted.json()['state'] == 'Accepted'
+    version_record = db.query(EvidenceVersion2).filter_by(upload_id=upload_id).one()
+    version_record.is_current = False
+    db.query(KPIResult2).filter_by(upload_id=upload_id).update({KPIResult2.is_stale: True})
+    db.commit()
+    stale_invoice = client.post(f'/api/milestones/{milestone.id}/invoice', headers=auth_headers('startup'),
+        data={'amount': '10000'}, files={'file': ('stale.pdf', b'%PDF synthetic invoice', 'application/pdf')})
+    assert stale_invoice.status_code == 409
+    version_record.is_current = True
+    db.query(KPIResult2).filter_by(upload_id=upload_id).update({KPIResult2.is_stale: False})
+    db.query(Milestone).filter(Milestone.id == milestone.id).update({Milestone.lifecycle_state: 'Accepted'})
+    db.commit()
     early_payment = client.post(f'/api/milestones/{milestone.id}/initiate-payment?invoice_id={uuid4()}&idempotency_key=early', headers=finance_headers)
     assert early_payment.status_code == 404
 

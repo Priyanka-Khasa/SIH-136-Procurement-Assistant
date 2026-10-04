@@ -54,7 +54,28 @@ def _latest_accepted_upload(db: Session, agreement_id: str):
         raise HTTPException(409, detail='The latest evidence must be current and accepted by an independent validator.')
     if not results or any(item.outcome != 'passed' or item.is_stale for item in results):
         raise HTTPException(409, detail='All current KPI results must pass before milestone acceptance.')
+    from app.models.pilot import AgreementVersion
+    from app.services.evidence_invalidation import measurement_plan_for_version, measurement_plan_fingerprint
+    active_plan = db.scalar(select(AgreementVersion).where(AgreementVersion.agreement_id == agreement_id,
+        AgreementVersion.approved.is_(True)).order_by(AgreementVersion.version.desc()))
+    expected = measurement_plan_fingerprint(measurement_plan_for_version(active_plan))
+    if version.metric_definition_hash and version.measurement_plan_snapshot:
+        stored_plan = dict(version.measurement_plan_snapshot)
+        stored_calculator = stored_plan.pop('calculator_version', None)
+        from app.services.evidence_engine import CALCULATOR_VERSION
+        if stored_calculator != CALCULATOR_VERSION or measurement_plan_fingerprint(stored_plan) != expected:
+            raise HTTPException(409, detail='Evidence uses an outdated measurement plan and must be recalculated before payment.')
     return upload
+
+
+def _require_latest_accepted_upload(db: Session, agreement_id: str) -> EvidenceUpload:
+    """Fail closed if evidence was replaced or its locked inputs changed."""
+    accepted_upload = _latest_accepted_upload(db, agreement_id)
+    latest_upload = db.scalar(select(EvidenceUpload).where(EvidenceUpload.pilot_agreement_id == agreement_id)
+                              .order_by(EvidenceUpload.created_at.desc()))
+    if latest_upload is None or latest_upload.id != accepted_upload.id:
+        raise HTTPException(409, detail='The accepted evidence is no longer the latest submission; milestone payment is blocked.')
+    return accepted_upload
 
 
 @router.post('/{id}/accept-evidence')
@@ -79,6 +100,7 @@ async def submit_invoice(id: str, amount: int = Form(...), reference: str = Form
     _require_milestone_startup_access(db, item, current_user)
     if item.lifecycle_state != 'Accepted':
         raise HTTPException(409, detail='A milestone invoice can be submitted only after its evidence is accepted.')
+    _require_latest_accepted_upload(db, item.agreement_id)
     if amount <= 0:
         raise HTTPException(422, detail='Invoice amount must be greater than zero.')
     if amount > item.amount:
@@ -116,6 +138,7 @@ def approve_invoice(id: str, invoice_id: str, db: Session = Depends(get_db), cur
         raise HTTPException(404, detail='Invoice not found for this milestone.')
     if item.lifecycle_state != 'Accepted' or invoice.approval_status != 'Submitted':
         raise HTTPException(409, detail='Invoice approval requires an Accepted milestone and a submitted invoice.')
+    _require_latest_accepted_upload(db, item.agreement_id)
     invoice.approval_status = 'Approved'
     invoice.approved_by = UUID(current_user.sub)
     invoice.approved_at = datetime.now(timezone.utc).replace(tzinfo=None)
@@ -148,6 +171,7 @@ def initiate_payment(id: str, invoice_id: str, idempotency_key: str, db: Session
                 'reference': existing.reference, 'simulated': True, 'banner': 'Simulated settlement. No real funds move.'}
     if item.lifecycle_state != 'Invoice Approved' or invoice.approval_status != 'Approved':
         raise HTTPException(409, detail='Payment can start only after the invoice is approved.')
+    _require_latest_accepted_upload(db, item.agreement_id)
     payment = PaymentRecord(invoice_id=UUID(invoice_id), idempotency_key=idempotency_key,
                             approved_by=UUID(current_user.sub), status='Initiated',
                             reference=f'SIM-{uuid4().hex[:12].upper()}', simulated=True,
@@ -178,6 +202,7 @@ def confirm_payment(id: str, payment_id: str, db: Session = Depends(get_db),
         raise HTTPException(404, detail='Payment request not found for this milestone.')
     if item.lifecycle_state != 'Payment Initiated' or payment.status != 'Initiated' or not payment.simulated:
         raise HTTPException(409, detail='Only an initiated simulated payment can be confirmed.')
+    _require_latest_accepted_upload(db, item.agreement_id)
     payment.status = 'Confirmed'
     item.lifecycle_state = 'Payment Confirmed'
     item.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)

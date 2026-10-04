@@ -6,7 +6,6 @@ Prefix: (none – full paths specified per endpoint)
 import io
 from pathlib import Path
 from typing import Optional
-import hashlib
 import json
 
 import pandas as pd
@@ -35,7 +34,9 @@ from app.services.evidence_engine import (
     recalculate_kpis,
     run_quality_checks,
     MEASUREMENT_PLAN,
+    CALCULATOR_VERSION,
 )
+from app.services.evidence_invalidation import measurement_plan_for_version, measurement_plan_fingerprint, comparable_measurement_plan
 
 router = APIRouter()
 
@@ -259,22 +260,12 @@ async def upload_evidence(
     next_version_number = (prev_version.version_number + 1) if prev_version else 1
 
     # ── Quality checks ────────────────────────────────────────────────────
-    plan = dict(MEASUREMENT_PLAN)
     agreement_version = (db.query(AgreementVersion).filter(AgreementVersion.agreement_id == pilot_agreement_id, AgreementVersion.approved == True).order_by(AgreementVersion.version.desc()).first())  # noqa: E712
-    if agreement_version:
-        plan.update({
-            "baseline_minutes": agreement_version.baseline_minutes,
-            "target_reduction_pct": agreement_version.target_pct,
-            "max_error_rate_pct": agreement_version.error_limit_pct,
-            "min_marathi_accuracy_pct": agreement_version.marathi_accuracy_pct,
-            "min_marathi_samples": agreement_version.min_marathi_observations,
-            "min_total_observations": agreement_version.min_observations,
-            "max_bandwidth_mbps": agreement_version.bandwidth_mbps,
-        })
-    metric_definition_hash = hashlib.sha256(json.dumps(plan, sort_keys=True).encode()).hexdigest()
+    plan = measurement_plan_for_version(agreement_version)
+    metric_definition_hash = measurement_plan_fingerprint(plan)
     findings = run_quality_checks(df, prev_df,
         prev_version.metric_definition_hash if prev_version else None,
-        metric_definition_hash)
+        metric_definition_hash, plan)
     finding_records: list[QualityFinding] = []
     for f in findings:
         rec = QualityFinding(
@@ -332,7 +323,7 @@ async def upload_evidence(
         sha256_hash=sha256_hash,
         is_current=True,
         metric_definition_hash=metric_definition_hash,
-        measurement_plan_snapshot=plan,
+        measurement_plan_snapshot={**comparable_measurement_plan(plan), "calculator_version": CALCULATOR_VERSION},
     )
     db.add(version_rec)
 

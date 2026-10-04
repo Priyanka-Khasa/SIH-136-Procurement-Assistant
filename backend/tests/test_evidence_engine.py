@@ -62,3 +62,46 @@ def test_missing_and_failed_are_distinct_outcomes():
     assert outcomes['reduction_pct'] == 'failed'
     assert outcomes['marathi_accuracy_pct'] == 'missing_evidence'
     assert outcomes['low_bandwidth_pct'] == 'missing_evidence'
+
+
+def test_each_quality_check_returns_structured_findings():
+    base = pd.DataFrame({
+        'case_id': ['1', '1', '3', '4'],
+        'language': ['Marathi', 'Marathi', 'Hindi', 'Hindi'],
+        'processing_time_before': [10, 10, 0, 10],
+        'processing_time_after': [5, 5, 5, 1000],
+        'error_flag': [0, 0, 0, 0],
+        'low_bandwidth': [True, True, False, False],
+        'outcome': ['success', 'failed', 'success', 'success'],
+        'period': [1, 1, 3, None],
+    })
+    findings = run_quality_checks(base, pd.DataFrame({'older_column': [1]}), 'old-definition', 'new-definition',
+                                  {'min_total_observations': 10, 'min_marathi_samples': 4, 'min_segment_samples': 3})
+    names = {finding['check_name'] for finding in findings}
+    assert {'missing_periods', 'duplicate_rows', 'unsupported_denominators', 'changed_metric_definition',
+            'excluded_failed_cases', 'sample_size_adequacy', 'outliers'} <= names
+    for finding in findings:
+        assert finding['severity'] in {'critical', 'major', 'minor', 'info'}
+        assert isinstance(finding['rows_affected'], int)
+        assert isinstance(finding['explanation'], str) and finding['explanation']
+        assert isinstance(finding['row_indices'], list)
+
+
+def test_required_column_omission_and_bad_values_are_missing_evidence():
+    frame = pd.DataFrame({'processing_time_before': ['bad'] * 2, 'processing_time_after': [4, 3]})
+    findings = run_quality_checks(frame)
+    assert any(item['check_name'] == 'missing_required_columns' for item in findings)
+    kpis = recalculate_kpis(frame, {}, {'min_total_observations': 1})
+    assert kpis[0]['outcome'] == 'missing_evidence'
+    assert kpis[0]['recomputed_value'] is None
+    assert kpis[1]['outcome'] == 'missing_evidence'
+    assert kpis[1]['recomputed_value'] is None
+
+
+def test_low_bandwidth_minimum_is_taken_from_measurement_plan():
+    frame = pd.DataFrame({'processing_time_before': [10] * 10, 'processing_time_after': [8] * 10,
+        'error_flag': [0] * 10, 'language': ['Marathi'] * 10, 'outcome': ['success'] * 10,
+        'low_bandwidth': [True] + [False] * 9})
+    result = recalculate_kpis(frame, {}, {'min_total_observations': 1, 'min_marathi_samples': 1,
+                                         'min_low_bandwidth_samples': 2})
+    assert result[3]['outcome'] == 'missing_evidence'

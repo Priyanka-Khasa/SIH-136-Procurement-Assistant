@@ -1,5 +1,6 @@
 from datetime import date, timedelta
 from copy import deepcopy
+import math
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -20,6 +21,9 @@ from app.models.startup import Application, Startup
 from app.models.user import User
 from app.workflow.engine import LifecycleError, create_pilot, transition_pilot
 from app.workflow.models import PilotRecord
+from app.services.evidence_engine import MEASUREMENT_PLAN
+from app.services.evidence_invalidation import invalidate_current_evidence
+from app.models.payment import Invoice, PaymentRecord
 
 router = APIRouter(tags=['Officer'])
 
@@ -45,12 +49,14 @@ class AgreementDraftRequest(BaseModel):
     change_note: str = 'Initial agreement draft'
     approver_user_ids: list[str] = Field(min_length=1)
     milestones: list[dict] = Field(default_factory=list)
+    measurement_plan: dict[str, float | int] = Field(default_factory=dict)
 
 
 class AgreementRevisionRequest(BaseModel):
     clauses: dict[str, str]
     change_note: str = Field(min_length=3)
     milestones: list[dict] = Field(default_factory=list)
+    measurement_plan: dict[str, float | int] | None = None
 
 
 class TermsAcceptance(BaseModel):
@@ -68,6 +74,7 @@ class PilotStartRequest(BaseModel):
 class AgreementTemplateRequest(BaseModel):
     template_key: str = Field(default='standard-pilot', min_length=2, max_length=80, pattern=r'^[a-zA-Z0-9][a-zA-Z0-9._-]*$')
     clauses: dict[str, str]
+    label: str | None = Field(default=None, min_length=2, max_length=120)
 
 
 def _version_dict(version: AgreementVersion) -> dict:
@@ -75,6 +82,16 @@ def _version_dict(version: AgreementVersion) -> dict:
         'id': str(version.id), 'agreement_id': version.agreement_id, 'version': version.version,
         'template_key': version.template_key, 'template_version': version.template_version,
         'clauses': version.clauses or {},
+        'measurement_plan': {
+            'baseline_minutes': version.baseline_minutes,
+            'target_reduction_pct': version.target_pct,
+            'max_error_rate_pct': version.error_limit_pct,
+            'min_marathi_accuracy_pct': version.marathi_accuracy_pct,
+            'min_total_observations': version.min_observations,
+            'min_marathi_samples': version.min_marathi_observations,
+            'max_bandwidth_mbps': version.bandwidth_mbps,
+            'capacity_per_day': version.capacity_per_day,
+        },
         'change_note': version.change_note, 'approved': version.approved,
         'start_date': version.start_date.isoformat(), 'end_date': version.end_date.isoformat(),
     }
@@ -147,17 +164,30 @@ def _create_milestones(db: Session, agreement_id: str, milestones: list[dict], s
 
 
 def _make_version(db: Session, agreement_id: str, template_key: str, clauses: dict[str, str], *,
-                  user_id: UUID, change_note: str, version_number: int, template_version: int = 1) -> AgreementVersion:
+                  user_id: UUID, change_note: str, version_number: int, template_version: int = 1,
+                  measurement_plan: dict | None = None) -> AgreementVersion:
     missing = [key for key in CLAUSE_KEYS if not clauses.get(key, '').strip()]
     if missing:
         raise HTTPException(status_code=422, detail=f'Missing required agreement clauses: {", ".join(missing)}.')
     today = date.today()
     start_date = today + timedelta(days=7)
+    plan = {**MEASUREMENT_PLAN, **(measurement_plan or {})}
+    allowed_keys = {'baseline_minutes', 'target_reduction_pct', 'max_error_rate_pct', 'min_marathi_accuracy_pct',
+                    'min_marathi_samples', 'min_total_observations', 'max_bandwidth_mbps', 'capacity_per_day',
+                    'min_low_bandwidth_samples', 'min_low_bandwidth_success_pct', 'min_segment_samples'}
+    if set(plan) - allowed_keys or any(not isinstance(v, (int, float)) or not math.isfinite(float(v)) or v < 0 for v in plan.values()):
+        raise HTTPException(status_code=422, detail='Measurement plan contains unsupported or negative values.')
+    if any(not 0 <= float(plan[key]) <= 100 for key in ('target_reduction_pct', 'max_error_rate_pct', 'min_marathi_accuracy_pct')):
+        raise HTTPException(status_code=422, detail='Percentage thresholds must be between 0 and 100.')
+    if plan['baseline_minutes'] <= 0 or plan['max_bandwidth_mbps'] <= 0 or plan['min_total_observations'] < 1 or plan['min_marathi_samples'] < 1 or plan['capacity_per_day'] < 1 or plan['min_low_bandwidth_samples'] < 1:
+        raise HTTPException(status_code=422, detail='Measurement plan baseline, sample sizes, bandwidth, and capacity must be positive.')
     version = AgreementVersion(
         id=uuid4(), agreement_id=agreement_id, version=version_number,
-        baseline_minutes=0, target_pct=0, error_limit_pct=0, marathi_accuracy_pct=0,
-        min_observations=0, min_marathi_observations=0, bandwidth_mbps=0,
-        capacity_per_day=0, start_date=start_date, end_date=start_date + timedelta(days=90),
+        baseline_minutes=plan['baseline_minutes'], target_pct=plan['target_reduction_pct'],
+        error_limit_pct=plan['max_error_rate_pct'], marathi_accuracy_pct=plan['min_marathi_accuracy_pct'],
+        min_observations=plan['min_total_observations'], min_marathi_observations=plan['min_marathi_samples'],
+        bandwidth_mbps=plan['max_bandwidth_mbps'], capacity_per_day=plan['capacity_per_day'],
+        start_date=start_date, end_date=start_date + timedelta(days=90),
         revised_by=user_id, revision_reason=change_note, template_key=template_key,
         template_version=template_version,
         clauses=clauses, change_note=change_note, approved=False,
@@ -183,7 +213,7 @@ def publish_agreement_template(payload: AgreementTemplateRequest, db: Session = 
         raise HTTPException(status_code=422, detail='Template must include every required clause.')
     latest = db.scalar(select(AgreementTemplate).where(AgreementTemplate.template_key == key).order_by(AgreementTemplate.version.desc()))
     item = AgreementTemplate(id=uuid4(), template_key=key, version=(latest.version + 1 if latest else 1),
-                             label=str(payload.get('label', key)), clauses=clauses, published=True,
+                             label=payload.label or key, clauses=clauses, published=True,
                              created_by=UUID(current_user.sub))
     db.add(item); db.commit(); db.refresh(item)
     write_audit_event(db, current_user.sub, current_user.role, 'agreement.template_published', 'AgreementTemplate', str(item.id), f'Published template {key} v{item.version}.')
@@ -222,7 +252,8 @@ def create_agreement_draft(payload: AgreementDraftRequest, db: Session = Depends
     db.add(agreement); db.flush()
     version = _make_version(db, agreement_id, payload.template_key, clauses, user_id=creator_uuid,
                              change_note=payload.change_note, version_number=1,
-                             template_version=template.version if template else 1)
+                             template_version=template.version if template else 1,
+                             measurement_plan=payload.measurement_plan)
     _create_milestones(db, agreement_id, payload.milestones, version.start_date)
     _create_lifecycle_record(db, agreement_id, current_user.sub)
     db.commit()
@@ -272,6 +303,10 @@ def revise_agreement(agreement_id: str, payload: AgreementRevisionRequest, db: S
     latest = db.scalar(select(AgreementVersion).where(AgreementVersion.agreement_id == agreement_id).order_by(AgreementVersion.version.desc()))
     if not latest or not latest.approved:
         raise HTTPException(status_code=409, detail='Only an approved agreement can be revised into a new version.')
+    invoice_history = db.scalar(select(Invoice.id).join(Milestone, Invoice.milestone_id == Milestone.id)
+                                .where(Milestone.agreement_id == agreement_id).limit(1))
+    if invoice_history:
+        raise HTTPException(status_code=409, detail='Agreement criteria cannot be revised after invoice history exists; preserve the payment record and create a new pilot version.')
     selected_template = db.scalar(select(AgreementTemplate).where(
         AgreementTemplate.template_key == latest.template_key,
         AgreementTemplate.published.is_(True),
@@ -280,7 +315,17 @@ def revise_agreement(agreement_id: str, payload: AgreementRevisionRequest, db: S
         db.delete(milestone)
     version = _make_version(db, agreement_id, latest.template_key, payload.clauses, user_id=UUID(current_user.sub),
                             change_note=payload.change_note, version_number=latest.version + 1,
-                            template_version=selected_template.version if selected_template else latest.template_version)
+                            template_version=selected_template.version if selected_template else latest.template_version,
+                            measurement_plan=payload.measurement_plan or {
+                                'baseline_minutes': latest.baseline_minutes,
+                                'target_reduction_pct': latest.target_pct,
+                                'max_error_rate_pct': latest.error_limit_pct,
+                                'min_marathi_accuracy_pct': latest.marathi_accuracy_pct,
+                                'min_total_observations': latest.min_observations,
+                                'min_marathi_samples': latest.min_marathi_observations,
+                                'max_bandwidth_mbps': latest.bandwidth_mbps,
+                                'capacity_per_day': latest.capacity_per_day,
+                            })
     _create_milestones(db, agreement_id, payload.milestones, version.start_date)
     agreement.status = 'Draft'
     agreement.terms_accepted = False
@@ -307,6 +352,7 @@ def approve_agreement(agreement_id: str, db: Session = Depends(get_db), current_
     matching['approved_at'] = date.today().isoformat()
     agreement.approval_chain = chain
     all_approved = bool(chain) and all(item['approved'] for item in chain)
+    invalidated = 0
     latest = db.scalar(select(AgreementVersion).where(AgreementVersion.agreement_id == agreement_id).order_by(AgreementVersion.version.desc()))
     if not latest:
         raise HTTPException(status_code=409, detail='Agreement version is missing.')
@@ -315,6 +361,7 @@ def approve_agreement(agreement_id: str, db: Session = Depends(get_db), current_
         agreement.approved_by = UUID(current_user.sub)
         if latest:
             latest.approved = True
+            invalidated = invalidate_current_evidence(db, agreement_id, reason='approved_measurement_plan_changed')
         for milestone in db.scalars(select(Milestone).where(Milestone.agreement_id == agreement_id)):
             milestone.lifecycle_state = 'Agreement Approved'
         lifecycle = db.get(PilotRecord, agreement_id)
@@ -322,7 +369,8 @@ def approve_agreement(agreement_id: str, db: Session = Depends(get_db), current_
             transition_pilot(db, agreement_id, 'Agreement Approved', actor=current_user.sub, role=current_user.role, reason='All named approvers completed review.')
     else:
         db.commit()
-    write_audit_event(db, current_user.sub, current_user.role, 'agreement.approver_recorded', 'PilotAgreement', agreement_id, f'Named approver recorded approval; all_approved={all_approved}.')
+    write_audit_event(db, current_user.sub, current_user.role, 'agreement.approver_recorded', 'PilotAgreement', agreement_id,
+                      f'Named approver recorded approval; all_approved={all_approved}; current_evidence_invalidated={invalidated if all_approved else 0}.')
     return {'id': agreement_id, 'status': agreement.status, 'all_approved': all_approved, 'approval_chain': chain}
 
 
