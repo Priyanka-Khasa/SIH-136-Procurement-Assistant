@@ -1,4 +1,4 @@
-import { isLocalDemoToken, isReadOnlyDemoRequest, maySendBearerTokenToBackend } from './demoMode';
+import { isLocalDemoToken, isReadOnlyDemoRequest, maySendBearerTokenToBackend, isSampleAccount, parseCredentialForm } from './demoMode';
 
 export const API_URL = import.meta.env.VITE_API_URL || '';
 
@@ -45,6 +45,10 @@ function offlineDemoFetch(path: string, init: RequestInit): Response | null {
   if (route === '/api/auth/me') return response(JSON.parse(window.localStorage.getItem('pilotproof-user') || '{}'));
   if (route === '/api/auth/demo-users') return response([{ id: 'demo-officer', name: 'Officer Priya Sharma', role: 'officer' }, { id: 'demo-validator', name: 'Validator Rajan Patel', role: 'validator' }, { id: 'demo-finance', name: 'Finance Deepa Rao', role: 'finance' }]);
   if (route === '/api/pilots' || route.startsWith('/api/pilots/')) return response(route.endsWith('/templates') ? [{ key: 'standard', name: 'Standard pilot agreement', clauses: {} }] : []);
+  if (route === '/api/milestones') return response({ items: [
+    { id: 'demo-milestone-evidence', agreement_id: 'demo-agreement', code: 'PP-204-M2', title: 'Evidence verification (synthetic)', state: 'Evidence Submitted', days_in_state: 2, why_blocked: 'Synthetic demo record. A validator review is required before acceptance.' },
+    { id: 'demo-milestone-payment', agreement_id: 'demo-agreement', code: 'PP-204-M3', title: 'Simulated settlement (synthetic)', state: 'Validated', days_in_state: 1, why_blocked: 'Synthetic demo record. Officer acceptance is required before invoice processing.' },
+  ], states: ['Validated', 'Accepted', 'Invoice Approved', 'Payment Initiated', 'Payment Confirmed'], settlement_notice: 'Simulated settlement. No real funds move.', funds_notice: 'Synthetic demo records only.' });
   if (route.startsWith('/api/evaluations/')) return response(route.includes('committee') ? { items: [], decisions: [], challenge_id: 'MH-MUNI-SC-001' } : route.includes('rubric') ? { version: 1, criteria: [] } : []);
   if (route === '/api/discovery/eligibility/me') return response({ items: [], startup: null, synthetic: true });
   if (route.startsWith('/api/discovery/startups/') && init.method === 'POST') return response({ detail: 'Uploads are disabled in local demo mode.' }, 501);
@@ -60,22 +64,18 @@ export async function apiFetch(path: string, init: RequestInit = {}): Promise<Re
   if (path.split('?')[0] === '/api/auth/token') {
     try {
       const live = await fetch(`${API_URL}${path}`, init);
-      if (![404, 502, 503, 504].includes(live.status)) {
+      if (![404, 500, 502, 503, 504].includes(live.status)) {
         if (live.status !== 401) return live;
-        const body = new URLSearchParams(typeof init.body === 'string' ? init.body : '');
-        const email = (body.get('username') || '').trim().toLowerCase();
-        const role = email.split('@')[0];
-        const roles = ['officer', 'startup', 'evaluator', 'validator', 'finance', 'district'];
-        if (!email.endsWith('@pilotproof.dev') || !roles.includes(role) || body.get('password') !== 'demo1234') return live;
+        const values = parseCredentialForm(init.body as string | URLSearchParams | null | undefined);
+        if (!isSampleAccount(values.get('username'), values.get('password'))) return live;
       }
     } catch {
       // Continue into the explicit local demo credential check below.
     }
-    const body = new URLSearchParams(typeof init.body === 'string' ? init.body : '');
-    const email = (body.get('username') || '').trim().toLowerCase();
+    const values = parseCredentialForm(init.body as string | URLSearchParams | null | undefined);
+    const email = (values.get('username') || '').trim().toLowerCase();
     const role = email.split('@')[0];
-    const roles = ['officer', 'startup', 'evaluator', 'validator', 'finance', 'district'];
-    if (!email.endsWith('@pilotproof.dev') || !roles.includes(role) || body.get('password') !== 'demo1234') return response({ detail: 'Incorrect email or password' }, 401);
+    if (!isSampleAccount(email, values.get('password'))) return response({ detail: 'Incorrect email or password' }, 401);
     const user = { email, role, name: `${role} Demo`, sub: `demo:${email}`, demo: true };
     const token = `${encodeTokenPart({ alg: 'none', typ: 'JWT' })}.${encodeTokenPart(user)}.local-demo`;
     window.localStorage.setItem('pilotproof-demo-mode', 'true');

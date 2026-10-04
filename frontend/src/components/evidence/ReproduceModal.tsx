@@ -52,7 +52,7 @@ export const ReproduceModal: React.FC<ReproduceModalProps> = ({ kpi, sha256Hash,
             {/* Header */}
             <div className='flex items-start justify-between gap-4 p-6 border-b border-border'>
               <div>
-                <p className='text-[10px] uppercase tracking-[0.18em] text-saffron mb-1'>
+                <p className='text-[10px] uppercase tracking-[0.18em] text-primary mb-1'>
                   Reproduce this result
                 </p>
                 <h2 className='font-heading text-xl font-bold text-text'>{kpi.kpi_label}</h2>
@@ -61,10 +61,10 @@ export const ReproduceModal: React.FC<ReproduceModalProps> = ({ kpi, sha256Hash,
                   <span
                     className={
                       kpi.outcome === 'passed'
-                        ? 'text-green-400'
+                        ? 'text-success'
                         : kpi.outcome === 'failed'
-                        ? 'text-red-400'
-                        : 'text-gray-400'
+                        ? 'text-danger'
+                        : 'text-muted'
                     }
                   >
                     {kpi.outcome.replace('_', ' ').toUpperCase()}
@@ -115,7 +115,7 @@ export const ReproduceModal: React.FC<ReproduceModalProps> = ({ kpi, sha256Hash,
                 <ol className='space-y-2'>
                   {kpi.calculation_steps.map((step, i) => (
                     <li key={i} className='flex gap-3 text-sm text-text'>
-                      <span className='shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-saffron/15 text-saffron font-bold text-[10px]'>
+                      <span className='shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-primary/15 text-primary font-bold text-[10px]'>
                         {i + 1}
                       </span>
                       <span className='leading-relaxed pt-0.5'>{step}</span>

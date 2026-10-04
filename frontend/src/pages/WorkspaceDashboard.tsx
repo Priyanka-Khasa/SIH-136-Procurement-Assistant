@@ -1,98 +1,53 @@
-import React from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Activity, ArrowRight, FileCheck2, Fingerprint, MapPinned, RefreshCw, ScanSearch, WalletCards } from 'lucide-react';
+import { apiFetch } from '../lib/api';
 import { PageHeader } from '../components/ui/PageHeader';
-import { StatTile } from '../components/ui/StatTile';
-import { Card } from '../components/ui/Card';
-import { Button } from '../components/ui/Button';
-import { LifecycleRail } from '../components/workflow/LifecycleRail';
-import { WhyBlocked } from '../components/workflow/WhyBlocked';
-import { Plus, Download } from 'lucide-react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { Skeleton } from '../components/ui/Skeleton';
 
-const data = [
-  { name: 'Jan', claims: 4000 },
-  { name: 'Feb', claims: 3000 },
-  { name: 'Mar', claims: 5000 },
-  { name: 'Apr', claims: 2780 },
-  { name: 'May', claims: 6890 },
-  { name: 'Jun', claims: 8390 },
+type Pilot = { id: string; startup_name?: string; challenge_title?: string; status?: string; state?: string; created_at?: string };
+type Milestone = { id: string; code?: string; title?: string; state: string; why_blocked?: string; days_in_state?: number };
+type PilotPayload = Pilot[] | { items?: Pilot[] };
+type MilestonePayload = Milestone[] | { items?: Milestone[] };
+
+function listFrom<T>(value: T[] | { items?: T[] }): T[] { return Array.isArray(value) ? value : value.items || []; }
+
+const shortcuts = [
+  { to: '/evidence', label: 'Review evidence', detail: 'Inspect submissions, findings, and recomputed KPIs', icon: ScanSearch },
+  { to: '/finance', label: 'Track payments', detail: 'View invoice and simulated settlement stages', icon: WalletCards },
+  { to: '/scale', label: 'Assess transfer', detail: 'Compare pilot conditions with a receiving district', icon: MapPinned },
+  { to: '/audit', label: 'Check audit trail', detail: 'Review recorded actions and chain integrity', icon: Fingerprint },
 ];
 
 export default function WorkspaceDashboard() {
-  return (
-    <div className='p-6 max-w-7xl mx-auto fade-in'>
-      <PageHeader 
-        title='Workspace Overview' 
-        eyebrow='Global Supply Chain'
-        actionSlot={
-          <>
-            <Button variant='outline' leftIcon={<Download size={16} />}>Export</Button>
-            <Button variant='primary' leftIcon={<Plus size={16} />}>New Claim</Button>
-          </>
-        }
-      />
+  const [pilots, setPilots] = useState<Pilot[] | null>(null);
+  const [milestones, setMilestones] = useState<Milestone[] | null>(null);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const load = useCallback(async () => {
+    setLoading(true); setError('');
+    try {
+      const [pilotResponse, milestoneResponse] = await Promise.all([apiFetch('/api/pilots'), apiFetch('/api/milestones')]);
+      const [pilotBody, milestoneBody] = await Promise.all([pilotResponse.json(), milestoneResponse.json()]);
+      if (!pilotResponse.ok) throw new Error(pilotBody.detail || 'Could not load pilot records.');
+      if (!milestoneResponse.ok) throw new Error(milestoneBody.detail || 'Could not load milestone records.');
+      setPilots(listFrom<Pilot>(pilotBody)); setMilestones(listFrom<Milestone>(milestoneBody));
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Workspace data could not be loaded.'); }
+    finally { setLoading(false); }
+  }, []);
+  useEffect(() => { void load(); }, [load]);
 
-      <div className='grid grid-cols-1 md:grid-cols-3 gap-6 mb-8'>
-        <StatTile title='Total Verifications' value={12489} trend={12} />
-        <StatTile title='Pending Claims' value={432} trend={-5} />
-        <StatTile title='Disputed Records' value={18} trend={2} />
-      </div>
-
-      <Card className='p-6 mb-8'>
-        <div className='mb-5 flex flex-wrap items-end justify-between gap-3'>
-          <div>
-            <p className='text-xs uppercase tracking-[0.18em] text-muted'>Pilot lifecycle</p>
-            <h2 className='mt-1 font-heading text-2xl font-semibold text-text'>Pilot Evidence Passport</h2>
-          </div>
-          <span className='rounded-full border border-amber/30 bg-amber/10 px-3 py-1 text-xs text-amber'>Demo state: evidence pending</span>
-        </div>
-        <LifecycleRail currentStage='Pilot Running' blockedStage='Evidence Submitted' />
-        <div className='mt-6'>
-          <WhyBlocked dependency='evidence' milestone='Evidence Submitted' />
-        </div>
-      </Card>
-
-      <div className='grid grid-cols-1 lg:grid-cols-3 gap-6'>
-        <Card className='lg:col-span-2 p-6'>
-          <h3 className='text-lg font-semibold mb-6'>Verification Volume</h3>
-          <div className='h-[300px] w-full'>
-            <ResponsiveContainer width='100%' height='100%'>
-              <AreaChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id='colorClaims' x1='0' y1='0' x2='0' y2='1'>
-                    <stop offset='5%' stopColor='var(--saffron)' stopOpacity={0.8}/>
-                    <stop offset='95%' stopColor='var(--saffron)' stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray='3 3' stroke='var(--border)' vertical={false} />
-                <XAxis dataKey='name' stroke='var(--muted)' tick={{fill: 'var(--muted)'}} axisLine={false} tickLine={false} />
-                <YAxis stroke='var(--muted)' tick={{fill: 'var(--muted)'}} axisLine={false} tickLine={false} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: 'var(--surface)', borderColor: 'var(--border)', borderRadius: '8px' }}
-                  itemStyle={{ color: 'var(--text)' }}
-                />
-                <Area type='monotone' dataKey='claims' stroke='var(--saffron)' strokeWidth={2} fillOpacity={1} fill='url(#colorClaims)' />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
-
-        <Card className='p-6 bg-gradient-to-b from-surface to-raised border-saffron/30 relative overflow-hidden'>
-           <div className='absolute top-0 right-0 w-32 h-32 bg-saffron/10 rounded-full blur-[40px] pointer-events-none'></div>
-           <h3 className='text-lg font-semibold mb-2 relative z-10'>Attention Required</h3>
-           <p className='text-muted text-sm mb-6 relative z-10'>You have 5 claims that require manual review before the end of the week.</p>
-           
-           <div className='space-y-3 relative z-10'>
-             {[1,2,3].map(i => (
-               <div key={i} className='p-3 bg-bg rounded-md border border-border text-sm flex justify-between items-center hover:border-saffron/50 transition-colors cursor-pointer'>
-                 <span className='font-medium text-text'>Claim #{8490 + i}</span>
-                 <span className='text-rose text-xs font-medium'>Review needed</span>
-               </div>
-             ))}
-           </div>
-           
-           <Button className='w-full mt-6 relative z-10' variant='outline'>View All Pending</Button>
-        </Card>
-      </div>
-    </div>
-  );
+  const openMilestones = milestones?.filter((item) => item.state !== 'Payment Confirmed') || [];
+  return <div className='mx-auto max-w-7xl space-y-8 p-5 sm:p-7 lg:p-9'>
+    <PageHeader title='Your PilotProof workspace' eyebrow='PILOT LIFECYCLE' description='Follow pilot evidence, decisions, funding milestones, and transfer assessments from one place.' actionSlot={<button onClick={() => void load()} disabled={loading} aria-label='Refresh workspace data' className='inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text transition hover:bg-raised disabled:opacity-60'><RefreshCw size={16} className={loading ? 'animate-spin' : ''}/> Refresh</button>} />
+    {error && <div role='alert' className='flex flex-wrap items-center justify-between gap-3 rounded-xl border border-danger/30 bg-danger/10 p-4 text-sm text-text'><span>{error}</span><button onClick={() => void load()} className='font-semibold text-primary underline underline-offset-2'>Try again</button></div>}
+    <section aria-label='Pilot records' className='grid gap-4 md:grid-cols-2'>
+      <article className='rounded-2xl border border-border bg-surface p-5 shadow-sm'><div className='flex items-start justify-between'><div><p className='text-xs font-semibold uppercase tracking-[.14em] text-muted'>Pilot agreements</p><p className='mt-2 text-3xl font-semibold tracking-tight text-text'>{loading ? '—' : pilots?.length ?? 0}</p></div><span className='rounded-xl bg-primary/10 p-3 text-primary'><FileCheck2 size={20}/></span></div><p className='mt-3 text-sm text-muted'>Agreements and approved pilot scopes recorded in this workspace.</p></article>
+      <article className='rounded-2xl border border-border bg-surface p-5 shadow-sm'><div className='flex items-start justify-between'><div><p className='text-xs font-semibold uppercase tracking-[.14em] text-muted'>Open milestones</p><p className='mt-2 text-3xl font-semibold tracking-tight text-text'>{loading ? '—' : openMilestones.length}</p></div><span className='rounded-xl bg-warning/10 p-3 text-warning'><Activity size={20}/></span></div><p className='mt-3 text-sm text-muted'>Items still moving through validation, acceptance, and payment.</p></article>
+    </section>
+    <section><div className='mb-4'><p className='text-xs font-semibold uppercase tracking-[.16em] text-muted'>Workspace tools</p><h2 className='mt-1 font-heading text-xl font-semibold text-text'>Continue where the work happens</h2></div><div className='grid gap-3 sm:grid-cols-2 xl:grid-cols-4'>{shortcuts.map(({to,label,detail,icon:Icon})=><Link key={to} to={to} className='group rounded-2xl border border-border bg-surface p-5 transition duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'><span className='inline-flex rounded-xl bg-primary/10 p-2.5 text-primary'><Icon size={20}/></span><h3 className='mt-4 flex items-center justify-between font-semibold text-text'>{label}<ArrowRight size={16} className='text-muted transition group-hover:translate-x-1 group-hover:text-primary'/></h3><p className='mt-1 text-sm leading-relaxed text-muted'>{detail}</p></Link>)}</div></section>
+    <section className='rounded-2xl border border-border bg-surface p-5 sm:p-6'><div className='mb-4 flex items-center justify-between gap-4'><div><p className='text-xs font-semibold uppercase tracking-[.16em] text-muted'>Live records</p><h2 className='mt-1 font-heading text-xl font-semibold text-text'>Recent milestones</h2></div><Link to='/agreements' className='text-sm font-semibold text-primary hover:underline'>Open agreements</Link></div>
+      {loading ? <div className='space-y-3'><Skeleton className='h-16'/><Skeleton className='h-16'/></div> : openMilestones.length ? <ul className='divide-y divide-border'>{openMilestones.slice(0,5).map((item)=><li key={item.id} className='flex flex-wrap items-center justify-between gap-3 py-4 first:pt-1'><div className='min-w-0'><p className='truncate font-medium text-text'>{item.code ? `${item.code} · ` : ''}{item.title || 'Pilot milestone'}</p><p className='mt-1 text-xs text-muted'>{item.why_blocked || 'No blocker details recorded.'}</p></div><span className='rounded-full border border-border bg-raised px-3 py-1 text-xs font-medium text-text'>{item.state}</span></li>)}</ul> : !error ? <div className='rounded-xl border border-dashed border-border bg-raised/50 px-5 py-8 text-center'><p className='font-medium text-text'>No milestones recorded yet</p><p className='mt-1 text-sm text-muted'>Once an approved pilot agreement is created, its progress will appear here.</p><Link to='/agreements' className='mt-4 inline-flex items-center gap-2 text-sm font-semibold text-primary'>Open agreements <ArrowRight size={15}/></Link></div> : null}
+    </section>
+  </div>;
 }

@@ -8,11 +8,16 @@ i18n.use(initReactI18next).init({
     en: { translation: en },
     mr: { translation: mr },
   },
-  lng: 'en',
+  lng: typeof window !== 'undefined' && window.localStorage.getItem('pilotproof-language') === 'mr' ? 'mr' : 'en',
   fallbackLng: 'en',
   interpolation: {
     escapeValue: false,
   },
+});
+
+i18n.on('languageChanged', (language) => {
+  if (typeof window !== 'undefined') window.localStorage.setItem('pilotproof-language', language.startsWith('mr') ? 'mr' : 'en');
+  if (typeof document !== 'undefined') document.documentElement.lang = language.startsWith('mr') ? 'mr' : 'en';
 });
 
 export default i18n;

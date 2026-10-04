@@ -84,7 +84,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ rows, highlightedIndices, on
           <span className='ml-2 text-xs text-muted font-normal'>{rows.length} rows</span>
         </h3>
         {flaggedCount > 0 && (
-          <span className='inline-flex items-center gap-1 rounded-full bg-amber-100 border border-amber-300 text-amber-800 text-[10px] font-bold px-2 py-0.5'>
+          <span className='inline-flex items-center gap-1 rounded-full bg-warning/10 border border-warning/25 text-warning text-[10px] font-bold px-2 py-0.5'>
             ⚠ {flaggedCount} flagged
           </span>
         )}
@@ -108,7 +108,7 @@ export const DataGrid: React.FC<DataGridProps> = ({ rows, highlightedIndices, on
                   >
                     {formatHeader(col)}
                     {sortKey === col && (
-                      <span className='ml-1 text-saffron'>{sortDir === 'asc' ? '↑' : '↓'}</span>
+                      <span className='ml-1 text-primary'>{sortDir === 'asc' ? '↑' : '↓'}</span>
                     )}
                   </th>
                 ))}
@@ -127,9 +127,9 @@ export const DataGrid: React.FC<DataGridProps> = ({ rows, highlightedIndices, on
                       className={cn(
                       'cursor-pointer border-b border-border/40 transition-colors',
                       isHighlighted
-                        ? 'bg-orange-100 border-l-2 border-l-orange-400'
+                        ? 'bg-warning/10 border-l-2 border-l-warning'
                         : isFlagged
-                        ? 'bg-amber-50 hover:bg-amber-100/70'
+                        ? 'bg-warning/10 hover:bg-warning/20'
                         : 'hover:bg-raised/40'
                     )}
                   >

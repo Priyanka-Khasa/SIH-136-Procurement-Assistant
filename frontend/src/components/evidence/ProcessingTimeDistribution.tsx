@@ -107,40 +107,40 @@ export const ProcessingTimeDistribution: React.FC<ProcessingTimeDistributionProp
           <CartesianGrid strokeDasharray='3 3' stroke='rgba(255,255,255,0.06)' />
           <XAxis
             dataKey='label'
-            tick={{ fontSize: 9, fill: '#9ca3af' }}
+            tick={{ fontSize: 9, fill: 'rgb(var(--muted))' }}
             tickLine={false}
             axisLine={false}
             interval='preserveStartEnd'
           />
           <YAxis
-            tick={{ fontSize: 9, fill: '#9ca3af' }}
+            tick={{ fontSize: 9, fill: 'rgb(var(--muted))' }}
             tickLine={false}
             axisLine={false}
             allowDecimals={false}
           />
           <Tooltip
             contentStyle={{ fontSize: '11px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px' }}
-            labelStyle={{ color: '#e2e8f0', fontWeight: 600 }}
+            labelStyle={{ color: 'rgb(var(--text))', fontWeight: 600 }}
           />
-          <Legend wrapperStyle={{ fontSize: '10px', color: '#9ca3af' }} iconSize={8} />
-          <Bar dataKey='before' name='Before' fill='#3b82f6' opacity={0.6} radius={[2, 2, 0, 0]} isAnimationActive animationDuration={600} />
-          <Bar dataKey='after'  name='After'  fill='#22c55e' opacity={0.6} radius={[2, 2, 0, 0]} isAnimationActive animationDuration={600} />
+          <Legend wrapperStyle={{ fontSize: '10px', color: 'rgb(var(--muted))' }} iconSize={8} />
+          <Bar dataKey='before' name='Before' fill='rgb(var(--primary))' opacity={0.6} radius={[2, 2, 0, 0]} isAnimationActive animationDuration={600} />
+          <Bar dataKey='after'  name='After'  fill='rgb(var(--success))' opacity={0.6} radius={[2, 2, 0, 0]} isAnimationActive animationDuration={600} />
           {medBeforeLabel && (
             <ReferenceLine
               x={medBeforeLabel}
-              stroke='#3b82f6'
+              stroke='rgb(var(--primary))'
               strokeDasharray='4 3'
               strokeWidth={1.5}
-              label={{ value: `Med↑ ${medianBefore?.toFixed(1)}`, position: 'top', fontSize: 8, fill: '#3b82f6' }}
+              label={{ value: `Med↑ ${medianBefore?.toFixed(1)}`, position: 'top', fontSize: 8, fill: 'rgb(var(--primary))' }}
             />
           )}
           {medAfterLabel && (
             <ReferenceLine
               x={medAfterLabel}
-              stroke='#22c55e'
+              stroke='rgb(var(--success))'
               strokeDasharray='4 3'
               strokeWidth={1.5}
-              label={{ value: `Med↓ ${medianAfter?.toFixed(1)}`, position: 'top', fontSize: 8, fill: '#22c55e' }}
+              label={{ value: `Med↓ ${medianAfter?.toFixed(1)}`, position: 'top', fontSize: 8, fill: 'rgb(var(--success))' }}
             />
           )}
         </ComposedChart>

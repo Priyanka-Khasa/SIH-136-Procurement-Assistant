@@ -14,9 +14,9 @@ export interface ToastProps {
 }
 
 const icons = {
-  success: <CheckCircle className='text-teal' size={20} />,
-  error: <AlertCircle className='text-rose' size={20} />,
-  info: <Info className='text-violet' size={20} />,
+  success: <CheckCircle className='text-success' size={20} />,
+  error: <AlertCircle className='text-danger' size={20} />,
+  info: <Info className='text-primary' size={20} />,
 };
 
 export const Toast: React.FC<ToastProps> = ({ id, title, message, type = 'info', duration = 5000, onDismiss }) => {
@@ -64,7 +64,7 @@ export const Toast: React.FC<ToastProps> = ({ id, title, message, type = 'info',
       {duration > 0 && (
         <div className='absolute bottom-0 left-0 h-1 bg-border w-full'>
           <div 
-            className='h-full bg-saffron transition-all ease-linear'
+            className='h-full bg-primary transition-all ease-linear'
             style={{ width: `${progress}%` }}
           />
         </div>

@@ -46,14 +46,14 @@ export function WhyBlocked({ dependency, milestone }: WhyBlockedProps) {
   const Icon = detail.icon;
 
   return (
-    <Card className="border-amber/30 p-5">
+    <Card className="border-warning/30 p-5">
       <div className="flex items-start gap-3">
-        <span className="rounded-xl bg-amber/10 p-2 text-amber"><Icon className="h-5 w-5" /></span>
+        <span className="rounded-xl bg-warning/10 p-2 text-warning"><Icon className="h-5 w-5" /></span>
         <div className="min-w-0">
-          <p className="text-xs uppercase tracking-[0.18em] text-amber">Why this milestone is blocked</p>
+          <p className="text-xs uppercase tracking-[0.18em] text-warning">Why this milestone is blocked</p>
           <h3 className="mt-1 font-heading text-lg font-semibold text-text">{milestone}: {detail.title}</h3>
           <p className="mt-2 text-sm text-muted">{detail.explanation}</p>
-          <p className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-text"><ArrowRight className="h-4 w-4 text-saffron" />{detail.nextActor}</p>
+          <p className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-text"><ArrowRight className="h-4 w-4 text-primary" />{detail.nextActor}</p>
         </div>
       </div>
     </Card>

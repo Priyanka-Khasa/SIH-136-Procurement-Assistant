@@ -33,7 +33,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) => 
       className='h-screen shrink-0 bg-surface border-r border-border flex flex-col glass relative z-20 transition-all duration-300 ease-in-out'
     >
       <div className='h-16 flex items-center px-4 border-b border-border overflow-hidden'>
-        <ShieldCheck className='w-8 h-8 text-saffron shrink-0' />
+        <ShieldCheck className='w-8 h-8 text-primary shrink-0' />
         <AnimateText show={!collapsed} className='ml-3 font-heading font-bold text-lg whitespace-nowrap'>
           PilotProof
         </AnimateText>
@@ -46,13 +46,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) => 
             to={item.path}
             className={({ isActive }) => cn(
               'flex items-center px-3 py-2.5 rounded-md transition-colors relative group',
-              isActive ? 'bg-saffron/10 text-saffron' : 'text-muted hover:bg-raised hover:text-text'
+              isActive ? 'bg-primary/10 text-primary' : 'text-muted hover:bg-raised hover:text-text'
             )}
           >
             {({ isActive }) => (
               <>
                 {isActive && (
-                  <motion.div layoutId='sidebar-active' className='absolute left-0 top-1 bottom-1 w-1 bg-saffron rounded-r-md' />
+                  <motion.div layoutId='sidebar-active' className='absolute left-0 top-1 bottom-1 w-1 bg-primary rounded-r-md' />
                 )}
                 <item.icon className='w-5 h-5 shrink-0' />
                 <AnimateText show={!collapsed} className='ml-3 font-medium whitespace-nowrap'>
@@ -67,15 +67,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) => 
       <div className='p-4 mt-auto overflow-hidden'>
         {!collapsed && (
           <div className='bg-raised rounded-lg p-3 mb-4 border border-border'>
-            <h5 className='text-xs font-semibold mb-1 text-text'>System Status</h5>
-            <div className='flex items-center gap-2 text-xs text-teal'>
-              <span className='w-2 h-2 rounded-full bg-teal animate-pulse' /> All systems operational
+            <h5 className='text-xs font-semibold mb-1 text-text'>Demo environment</h5>
+            <div className='flex items-center gap-2 text-xs text-muted'>
+              <span className='w-2 h-2 rounded-full bg-warning' /> Synthetic sample records
             </div>
           </div>
         )}
         
         <button
           onClick={() => setCollapsed(!collapsed)}
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-expanded={!collapsed}
           className='w-full flex items-center justify-center p-2 text-muted hover:text-text hover:bg-raised rounded-md transition-colors'
         >
           {collapsed ? <PanelLeftOpen size={20} /> : <PanelLeftClose size={20} />}

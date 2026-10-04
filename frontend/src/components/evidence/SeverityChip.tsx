@@ -8,10 +8,10 @@ interface SeverityChipProps {
 }
 
 const config: Record<Severity, { label: string; classes: string }> = {
-  critical: { label: 'Critical', classes: 'bg-red-100 text-red-800 border-red-200' },
-  major:    { label: 'Major',    classes: 'bg-amber-100 text-amber-800 border-amber-200' },
-  minor:    { label: 'Minor',    classes: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
-  info:     { label: 'Info',     classes: 'bg-blue-100 text-blue-600 border-blue-200' },
+  critical: { label: 'Critical', classes: 'bg-danger/10 text-danger border-danger/25' },
+  major:    { label: 'Major',    classes: 'bg-warning/10 text-warning border-warning/25' },
+  minor:    { label: 'Minor',    classes: 'bg-raised text-muted border-border' },
+  info:     { label: 'Info',     classes: 'bg-primary/10 text-primary border-primary/25' },
 };
 
 export const SeverityChip: React.FC<SeverityChipProps> = ({ severity, className }) => {

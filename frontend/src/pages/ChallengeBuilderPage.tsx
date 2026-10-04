@@ -219,17 +219,17 @@ export default function ChallengeBuilderPage() {
     <div className='mx-auto max-w-5xl space-y-7 p-5 pb-16 sm:p-8'>
       <header className='hero-wash relative overflow-hidden rounded-[1.75rem] border border-border p-6 sm:p-8'>
         <div className='relative z-10 flex flex-wrap items-start justify-between gap-4'>
-          <div><p className='text-xs font-semibold uppercase tracking-[0.2em] text-saffron'>{t.eyebrow}</p><h1 className='mt-3 max-w-2xl font-heading text-3xl font-bold sm:text-4xl'>{t.title}</h1><p className='mt-3 max-w-2xl text-sm text-muted sm:text-base'>{t.sub}</p></div>
+          <div><p className='text-xs font-semibold uppercase tracking-[0.2em] text-primary'>{t.eyebrow}</p><h1 className='mt-3 max-w-2xl font-heading text-3xl font-bold sm:text-4xl'>{t.title}</h1><p className='mt-3 max-w-2xl text-sm text-muted sm:text-base'>{t.sub}</p></div>
           <button className='btn btn-ghost' type='button' onClick={() => update('input_language', language === 'en' ? 'mr' : 'en')}><Languages size={16} />{language === 'en' ? 'मराठी' : 'English'}</button>
         </div>
         <div className='mt-8 grid grid-cols-2 gap-2 sm:grid-cols-4'>
-          {steps.map((label, index) => <button key={label} type='button' onClick={() => setStep(index)} className={`rounded-xl border p-3 text-left transition-all ${step === index ? 'border-saffron/50 bg-saffron/10 text-text' : index < step ? 'border-teal/30 bg-teal/5 text-muted' : 'border-border bg-surface/50 text-muted'}`}><span className='mb-2 flex items-center gap-2 text-[10px] uppercase tracking-widest'><span className='flex h-5 w-5 items-center justify-center rounded-full bg-raised'>{index < step ? <Check size={12} /> : index + 1}</span>{t.step} {index + 1}</span><span className='text-sm font-semibold'>{label}</span></button>)}
+          {steps.map((label, index) => <button key={label} type='button' onClick={() => setStep(index)} className={`rounded-xl border p-3 text-left transition-all ${step === index ? 'border-primary/50 bg-primary/10 text-text' : index < step ? 'border-success/30 bg-success/5 text-muted' : 'border-border bg-surface/50 text-muted'}`}><span className='mb-2 flex items-center gap-2 text-[10px] uppercase tracking-widest'><span className='flex h-5 w-5 items-center justify-center rounded-full bg-raised'>{index < step ? <Check size={12} /> : index + 1}</span>{t.step} {index + 1}</span><span className='text-sm font-semibold'>{label}</span></button>)}
         </div>
       </header>
 
       <div className='grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]'>
         <Card className='p-5 sm:p-7'>
-          <div className='mb-6 flex items-center justify-between'><div><p className='text-xs uppercase tracking-[0.17em] text-muted'>{t.step} {step + 1} / 4</p><h2 className='mt-1 font-heading text-2xl font-semibold'>{steps[step]}</h2></div>{busy && <LoaderCircle className='animate-spin text-saffron' />}</div>
+          <div className='mb-6 flex items-center justify-between'><div><p className='text-xs uppercase tracking-[0.17em] text-muted'>{t.step} {step + 1} / 4</p><h2 className='mt-1 font-heading text-2xl font-semibold'>{steps[step]}</h2></div>{busy && <LoaderCircle className='animate-spin text-primary' />}</div>
 
           {step === 0 && <div className='grid gap-4 sm:grid-cols-2'>
             <label className='grid gap-1.5 text-sm text-muted sm:col-span-2'>{t.titleLabel}<input value={draft.title} onChange={(e) => update('title', e.target.value)} placeholder={language === 'en' ? 'e.g. Faster village water quality reporting' : 'उदा. गावातील पाणी गुणवत्ता अहवाल सुधारणा'} /></label>
@@ -242,7 +242,7 @@ export default function ChallengeBuilderPage() {
           {step === 1 && <div className='space-y-5'>
             <label className='grid gap-1.5 text-sm text-muted'>{t.outcomes}<textarea rows={5} value={draft.outcomes.join('\n')} onChange={(e) => update('outcomes', lines(e.target.value))} placeholder={'Faster service response\nFewer repeat visits'} /></label>
             <label className='grid gap-1.5 text-sm text-muted'>{t.metrics}<textarea rows={5} value={draft.metrics.join('\n')} onChange={(e) => update('metrics', lines(e.target.value))} placeholder={'Median time from request to resolution\nShare completed within agreed window'} /></label>
-            <p className='rounded-xl border border-violet/25 bg-violet/5 p-3 text-xs text-muted'>Measures should name a unit, source, sample and observation window. Do not publish unexplained percentages.</p>
+            <p className='rounded-xl border border-primary/25 bg-primary/5 p-3 text-xs text-muted'>Measures should name a unit, source, sample and observation window. Do not publish unexplained percentages.</p>
           </div>}
 
           {step === 2 && <div className='space-y-5'>
@@ -261,17 +261,17 @@ export default function ChallengeBuilderPage() {
             <div className='rounded-xl border border-border bg-raised/40 p-4'><p className='text-xs uppercase tracking-widest text-muted'>{t.problemLabel}</p><p className='mt-2 text-sm'>{draft.problem_statement || '—'}</p></div>
             <div className='grid gap-4 sm:grid-cols-2'><div className='rounded-xl border border-border p-4'><p className='text-xs uppercase tracking-widest text-muted'>{t.outcomes}</p><ul className='mt-2 list-disc space-y-1 pl-5 text-sm'>{draft.outcomes.map((item) => <li key={item}>{item}</li>)}</ul></div><div className='rounded-xl border border-border p-4'><p className='text-xs uppercase tracking-widest text-muted'>{t.metrics}</p><ul className='mt-2 list-disc space-y-1 pl-5 text-sm'>{draft.metrics.map((item) => <li key={item}>{item}</li>)}</ul></div></div>
             <div className='rounded-xl border border-border p-4'><p className='text-xs uppercase tracking-widest text-muted'>{t.baseline}</p><p className='mt-2 text-sm'>{draft.baseline}</p><p className='mt-3 text-xs text-muted'>{draft.test_plan || 'Test plan not specified'}{draft.test_duration_days ? ` · ${draft.test_duration_days} days` : ''}</p></div>
-            {aiBefore && <Card className='border-violet/30 p-4'><div className='mb-3 flex items-center gap-2 text-violet'><Sparkles size={16} /><span className='text-sm font-semibold'>{t.diff}</span><span className='chip chip-ai'>{t.aiNotice}</span></div><p className='mb-3 text-xs text-muted'>{t.noInvent}</p><div className='grid gap-3 sm:grid-cols-2'>{[
+            {aiBefore && <Card className='border-primary/30 p-4'><div className='mb-3 flex items-center gap-2 text-primary'><Sparkles size={16} /><span className='text-sm font-semibold'>{t.diff}</span><span className='chip chip-ai'>{t.aiNotice}</span></div><p className='mb-3 text-xs text-muted'>{t.noInvent}</p><div className='grid gap-3 sm:grid-cols-2'>{[
               ['Outcomes', aiBefore.outcomes.join('\n'), draft.outcomes.join('\n')],['Metrics', aiBefore.metrics.join('\n'), draft.metrics.join('\n')],['Baseline', aiBefore.baseline, draft.baseline],['Test plan', aiBefore.test_plan, draft.test_plan],['Acceptance', aiBefore.acceptance_criteria.join('\n'), draft.acceptance_criteria.join('\n')],
-            ].map(([label, before, proposed]) => <div key={label} className='rounded-lg border border-border p-3'><p className='mb-2 text-xs font-semibold uppercase tracking-widest text-muted'>{label}</p><p className='text-xs text-muted line-through decoration-rose/70'>{before || t.unavailable}</p><p className='mt-1 whitespace-pre-wrap text-sm text-teal'>{proposed || t.unavailable}</p></div>)}</div></Card>}
-            <label className='flex items-start gap-3 rounded-xl border border-saffron/30 bg-saffron/5 p-4 text-sm'><input className='mt-1 accent-saffron' type='checkbox' checked={approved} onChange={(e) => setApproved(e.target.checked)} /><span>{t.approve}</span></label>
+            ].map(([label, before, proposed]) => <div key={label} className='rounded-lg border border-border p-3'><p className='mb-2 text-xs font-semibold uppercase tracking-widest text-muted'>{label}</p><p className='text-xs text-muted line-through decoration-danger/70'>{before || t.unavailable}</p><p className='mt-1 whitespace-pre-wrap text-sm text-success'>{proposed || t.unavailable}</p></div>)}</div></Card>}
+            <label className='flex items-start gap-3 rounded-xl border border-primary/30 bg-primary/5 p-4 text-sm'><input className='mt-1 accent-primary' type='checkbox' checked={approved} onChange={(e) => setApproved(e.target.checked)} /><span>{t.approve}</span></label>
           </div>}
 
-          {error && <p role='alert' className='mt-5 rounded-lg border border-rose/30 bg-rose/5 p-3 text-sm text-rose'>{error}</p>}
-          {message && <p role='status' className='mt-5 rounded-lg border border-teal/30 bg-teal/5 p-3 text-sm text-teal'>{message}</p>}
+          {error && <p role='alert' className='mt-5 rounded-lg border border-danger/30 bg-danger/5 p-3 text-sm text-danger'>{error}</p>}
+          {message && <p role='status' className='mt-5 rounded-lg border border-success/30 bg-success/5 p-3 text-sm text-success'>{message}</p>}
           {step === 3 && versions.length > 0 && <div className='mt-6 space-y-3'>
             <h3 className='font-heading text-lg font-semibold'>{t.history}</h3>
-            <div className='flex flex-wrap gap-2'>{versions.map((version) => <span key={version.version} className={`rounded-full border px-3 py-1 text-xs ${version.is_published ? 'border-teal/30 bg-teal/10 text-teal' : 'border-amber/30 bg-amber/10 text-amber'}`}>v{version.version} · {version.is_published ? t.publishedLabel : t.draftVersion}</span>)}</div>
+            <div className='flex flex-wrap gap-2'>{versions.map((version) => <span key={version.version} className={`rounded-full border px-3 py-1 text-xs ${version.is_published ? 'border-success/30 bg-success/10 text-success' : 'border-warning/30 bg-warning/10 text-warning'}`}>v{version.version} · {version.is_published ? t.publishedLabel : t.draftVersion}</span>)}</div>
             {versions.length > 1 && (() => {
               const before = versions[versions.length - 2];
               const after = versions[versions.length - 1];
@@ -283,7 +283,7 @@ export default function ChallengeBuilderPage() {
                 ['Test plan', before.test_plan, after.test_plan],
                 ['Acceptance criteria', before.acceptance_criteria.join('\n'), after.acceptance_criteria.join('\n')],
               ];
-              return <div className='overflow-hidden rounded-xl border border-border'><div className='grid grid-cols-[140px_1fr_1fr] bg-raised/60 px-3 py-2 text-[10px] font-semibold uppercase tracking-widest text-muted'><span>Field</span><span>{t.from} · v{before.version}</span><span>{t.to} · v{after.version}</span></div>{rows.map(([label, oldValue, newValue]) => <div key={label} className='grid grid-cols-[140px_1fr_1fr] gap-2 border-t border-border px-3 py-3 text-xs'><span className='font-semibold text-muted'>{label}</span><span className='whitespace-pre-wrap text-rose'>{oldValue || t.unavailable}</span><span className='whitespace-pre-wrap text-teal'>{newValue || t.unavailable}</span></div>)}</div>;
+              return <div className='overflow-hidden rounded-xl border border-border'><div className='grid grid-cols-[140px_1fr_1fr] bg-raised/60 px-3 py-2 text-[10px] font-semibold uppercase tracking-widest text-muted'><span>Field</span><span>{t.from} · v{before.version}</span><span>{t.to} · v{after.version}</span></div>{rows.map(([label, oldValue, newValue]) => <div key={label} className='grid grid-cols-[140px_1fr_1fr] gap-2 border-t border-border px-3 py-3 text-xs'><span className='font-semibold text-muted'>{label}</span><span className='whitespace-pre-wrap text-danger'>{oldValue || t.unavailable}</span><span className='whitespace-pre-wrap text-success'>{newValue || t.unavailable}</span></div>)}</div>;
             })()}
             {challengeStatus === 'Open' && <Button variant='outline' onClick={() => void createRevision()} disabled={busy !== ''}><FilePlus2 size={16} />{t.revision}</Button>}
           </div>}
@@ -301,7 +301,7 @@ export default function ChallengeBuilderPage() {
 
         <aside className='space-y-4'>
           <Card className='p-5'><p className='text-xs uppercase tracking-widest text-muted'>Measurement integrity</p><h3 className='mt-2 font-heading text-lg font-semibold'>No invented baseline</h3><p className='mt-2 text-sm text-muted'>When evidence is missing, the form preserves “Baseline unavailable”. Targets and durations remain blank until an officer sets them.</p></Card>
-          <Card className='p-5'><p className='text-xs uppercase tracking-widest text-muted'>Versioning</p><h3 className='mt-2 font-heading text-lg font-semibold'>Lock on publish</h3><p className='mt-2 text-sm text-muted'>Publishing locks this measurement version. Later changes must be saved as a new version and approved before publication.</p>{challengeId && <p className='mt-3 font-mono text-xs text-saffron'>{challengeId}</p>}</Card>
+          <Card className='p-5'><p className='text-xs uppercase tracking-widest text-muted'>Versioning</p><h3 className='mt-2 font-heading text-lg font-semibold'>Lock on publish</h3><p className='mt-2 text-sm text-muted'>Publishing locks this measurement version. Later changes must be saved as a new version and approved before publication.</p>{challengeId && <p className='mt-3 font-mono text-xs text-primary'>{challengeId}</p>}</Card>
           <Link className='btn btn-ghost w-full' to='/discover'>Review applicant discovery <ArrowRight size={15} /></Link>
         </aside>
       </div>

@@ -15,7 +15,7 @@ export function Drawer({ open, onClose, children }: DrawerProps) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-40 flex justify-end bg-slate-950/60"
+          className="fixed inset-0 z-40 flex justify-end bg-text/60"
           onClick={onClose}
         >
           <motion.aside

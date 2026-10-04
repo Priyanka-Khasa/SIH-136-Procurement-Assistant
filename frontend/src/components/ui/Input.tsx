@@ -18,7 +18,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
     return (
       <div className='flex flex-col gap-1 w-full relative group'>
         {label && (
-          <label htmlFor={inputId} className='text-sm font-medium text-muted mb-1 ml-1 group-focus-within:text-saffron transition-colors -translate-y-0.5'>
+          <label htmlFor={inputId} className='text-sm font-medium text-muted mb-1 ml-1 group-focus-within:text-primary transition-colors -translate-y-0.5'>
             {label}
           </label>
         )}
@@ -31,8 +31,8 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
               'w-full',
               leftSlot ? 'pl-10' : 'pl-3',
               rightSlot ? 'pr-10' : 'pr-3',
-              error && 'border-rose focus:ring-rose/50 focus:border-rose',
-              success && 'border-teal focus:ring-teal/50 focus:border-teal',
+              error && 'border-danger focus:ring-danger/50 focus:border-danger',
+              success && 'border-success focus:ring-success/50 focus:border-success',
               className
             )}
             {...props}
@@ -40,7 +40,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
           {rightSlot && <div className='absolute right-3 text-muted'>{rightSlot}</div>}
         </div>
         {helperText && (
-          <span className={cn('text-xs ml-1 mt-1', error ? 'text-rose' : success ? 'text-teal' : 'text-muted')}>
+          <span className={cn('text-xs ml-1 mt-1', error ? 'text-danger' : success ? 'text-success' : 'text-muted')}>
             {helperText}
           </span>
         )}

@@ -13,7 +13,7 @@ export function Stepper({ steps, active }: StepperProps) {
           <div
             className={cn(
               'flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold',
-              index <= active ? 'bg-saffron text-slate-950' : 'bg-raised text-muted',
+              index <= active ? 'bg-primary text-on-primary' : 'bg-raised text-muted',
             )}
           >
             {index + 1}
@@ -22,7 +22,7 @@ export function Stepper({ steps, active }: StepperProps) {
             className={cn(
               'flex-1 rounded-lg border px-3 py-2 text-sm',
               index === active
-                ? 'border-saffron/40 bg-saffron/5 text-text'
+                ? 'border-primary/40 bg-primary/5 text-text'
                 : 'border-border bg-raised/50 text-muted',
             )}
           >

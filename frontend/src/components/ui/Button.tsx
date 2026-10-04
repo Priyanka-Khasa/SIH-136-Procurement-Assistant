@@ -11,11 +11,11 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 }
 
 const variantStyles = {
-  default: 'bg-saffron text-[#1f1604] hover:brightness-95 shadow-sm',
-  primary: 'bg-saffron text-[#1f1604] hover:brightness-95 shadow-glow',
+  default: 'bg-primary text-on-primary hover:brightness-95 shadow-sm',
+  primary: 'bg-primary text-on-primary hover:brightness-95 shadow-glow',
   outline: 'border border-border hover:bg-surface text-text',
   ghost: 'hover:bg-surface text-text',
-  danger: 'bg-rose text-white hover:bg-rose/90 shadow-sm',
+  danger: 'bg-danger text-on-primary hover:brightness-95 shadow-sm',
 };
 
 const sizeStyles = {
@@ -30,7 +30,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     return (
       <button
         className={cn(
-          'inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-saffron/50 disabled:opacity-50 disabled:pointer-events-none',
+          'inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:opacity-50 disabled:pointer-events-none',
           variantStyles[variant],
           sizeStyles[size],
           className

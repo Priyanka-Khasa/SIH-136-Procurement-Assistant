@@ -14,7 +14,7 @@ export default function DesignShowcasePage() {
         <div className='sticky top-24 space-y-2'>
           <h3 className='font-semibold text-sm uppercase tracking-wider text-muted mb-4'>Components</h3>
           {['Buttons', 'Badges & Chips', 'Inputs', 'Cards'].map(item => (
-            <a key={item} href={`#${item.toLowerCase().replace(/ /g, '-')}`} className='block text-sm text-muted hover:text-saffron py-1 transition-colors'>
+            <a key={item} href={`#${item.toLowerCase().replace(/ /g, '-')}`} className='block text-sm text-muted hover:text-primary py-1 transition-colors'>
               {item}
             </a>
           ))}
@@ -87,7 +87,7 @@ export default function DesignShowcasePage() {
             </Card>
             <Card glow className='p-6 md:col-span-2'>
               <h3 className='font-semibold mb-2'>Glow Card</h3>
-              <p className='text-muted text-sm'>Card with custom saffron glow hover effect.</p>
+              <p className='text-muted text-sm'>Card with custom primary glow hover effect.</p>
             </Card>
           </div>
         </section>

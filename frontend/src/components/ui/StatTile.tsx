@@ -16,13 +16,13 @@ export const StatTile: React.FC<StatTileProps> = ({ title, value, prefix = '', s
   return (
     <div
       className={cn(
-        'p-5 rounded-card bg-surface border border-border hover:border-saffron/50 transition-colors group relative overflow-hidden',
+        'p-5 rounded-card bg-surface border border-border hover:border-primary/50 transition-colors group relative overflow-hidden',
         className
       )}
       {...props}
     >
       <div className='absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity'>
-        <svg viewBox='0 0 100 50' className='w-16 h-8 stroke-saffron fill-none stroke-2'>
+        <svg viewBox='0 0 100 50' className='w-16 h-8 stroke-primary fill-none stroke-2'>
           <path d='M0 50 Q 25 25, 50 25 T 100 0' />
         </svg>
       </div>
@@ -32,7 +32,7 @@ export const StatTile: React.FC<StatTileProps> = ({ title, value, prefix = '', s
           {prefix}{count.toLocaleString()}{suffix}
         </h3>
         {trend !== undefined && (
-          <span className={cn('text-sm font-medium', trend >= 0 ? 'text-teal' : 'text-rose')}>
+          <span className={cn('text-sm font-medium', trend >= 0 ? 'text-success' : 'text-danger')}>
             {trend >= 0 ? '+' : ''}{trend}%
           </span>
         )}

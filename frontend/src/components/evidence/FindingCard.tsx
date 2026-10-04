@@ -21,8 +21,8 @@ export const FindingCard: React.FC<FindingCardProps> = ({ finding, onShowRows, i
       className={cn(
         'rounded-xl border p-4 transition-all duration-200',
         isSelected
-          ? 'border-amber-400 bg-amber-50/30 shadow-md'
-          : 'border-border bg-surface hover:border-amber-300/60'
+          ? 'border-warning bg-warning/30 shadow-md'
+          : 'border-border bg-surface hover:border-warning/60'
       )}
     >
       <div className='flex items-start justify-between gap-3 mb-2'>
@@ -37,7 +37,7 @@ export const FindingCard: React.FC<FindingCardProps> = ({ finding, onShowRows, i
       <p className='text-xs text-muted leading-relaxed mb-3'>{finding.explanation}</p>
       <button
         onClick={() => onShowRows(finding.row_indices)}
-        className='text-xs font-medium text-saffron hover:text-saffron/80 transition-colors underline underline-offset-2'
+        className='text-xs font-medium text-primary hover:text-primary/80 transition-colors underline underline-offset-2'
       >
         Show rows ↗
       </button>

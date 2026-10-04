@@ -18,6 +18,7 @@ const FinanceDashboardPage = React.lazy(() => import('./pages/FinanceDashboardPa
 const TransferAssessmentPage = React.lazy(() => import('./pages/TransferAssessmentPage'));
 const PassportPage = React.lazy(() => import('./pages/PassportPage'));
 const PublicVerifyPage = React.lazy(() => import('./pages/PublicVerifyPage'));
+const NotFoundPage = React.lazy(() => import('./pages/NotFoundPage'));
 
 function App() {
   return (
@@ -26,6 +27,7 @@ function App() {
         <Routes>
           <Route path='/' element={<LandingPage />} />
           <Route path='/verify/:id' element={<PublicVerifyPage />} />
+          <Route path='*' element={<NotFoundPage />} />
           <Route element={<AppShell />}>
             <Route path='/workspace' element={<WorkspaceDashboard />} />
             <Route path='/components' element={<DesignShowcasePage />} />

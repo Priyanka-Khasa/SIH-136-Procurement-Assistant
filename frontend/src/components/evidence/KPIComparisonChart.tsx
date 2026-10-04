@@ -19,11 +19,11 @@ interface KPIComparisonChartProps {
 function outcomeColor(outcome: KPIResult['outcome']): string {
   switch (outcome) {
     case 'passed':
-      return '#22c55e';
+      return 'rgb(var(--success))';
     case 'failed':
-      return '#ef4444';
+      return 'rgb(var(--danger))';
     case 'missing_evidence':
-      return '#9ca3af';
+      return 'rgb(var(--muted))';
   }
 }
 
@@ -83,15 +83,15 @@ export const KPIComparisonChart: React.FC<KPIComparisonChartProps> = ({ kpiResul
   return (
     <ResponsiveContainer width='100%' height={220}>
       <BarChart data={data} margin={{ top: 8, right: 16, bottom: 8, left: 0 }} barGap={4}>
-        <CartesianGrid strokeDasharray='3 3' stroke='rgba(255,255,255,0.06)' />
+        <CartesianGrid strokeDasharray='3 3' stroke='rgb(var(--border))' />
         <XAxis
           dataKey='name'
-          tick={{ fontSize: 10, fill: '#9ca3af' }}
+          tick={{ fontSize: 10, fill: 'rgb(var(--muted))' }}
           tickLine={false}
           axisLine={false}
         />
         <YAxis
-          tick={{ fontSize: 10, fill: '#9ca3af' }}
+          tick={{ fontSize: 10, fill: 'rgb(var(--muted))' }}
           tickLine={false}
           axisLine={false}
           tickFormatter={(v) => `${v}%`}
@@ -99,13 +99,13 @@ export const KPIComparisonChart: React.FC<KPIComparisonChartProps> = ({ kpiResul
         />
         <Tooltip content={<CustomTooltip />} />
         <Legend
-          wrapperStyle={{ fontSize: '10px', color: '#9ca3af' }}
+          wrapperStyle={{ fontSize: '10px', color: 'rgb(var(--muted))' }}
           iconSize={10}
           iconType='circle'
         />
         <Bar
           dataKey='Claimed'
-          fill='#3b82f6'
+          fill='rgb(var(--primary))'
           radius={[3, 3, 0, 0]}
           isAnimationActive
           animationDuration={600}
@@ -126,14 +126,14 @@ export const KPIComparisonChart: React.FC<KPIComparisonChartProps> = ({ kpiResul
         {threshold !== null && (
           <ReferenceLine
             y={threshold}
-            stroke='#f59e0b'
+            stroke='rgb(var(--warning))'
             strokeDasharray='4 3'
             strokeWidth={1.5}
             label={{
               value: `Threshold ${threshold}%`,
               position: 'right',
               fontSize: 9,
-              fill: '#f59e0b',
+              fill: 'rgb(var(--warning))',
             }}
           />
         )}

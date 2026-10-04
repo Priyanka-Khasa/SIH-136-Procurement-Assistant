@@ -153,29 +153,29 @@ export const statusMeta: Record<
   StatusType,
   { label: string; icon: typeof ShieldCheck; tint: string }
 > = {
-  Verified: { label: 'Verified', icon: ShieldCheck, tint: 'text-teal' },
-  Pending: { label: 'Pending', icon: Hourglass, tint: 'text-amber' },
-  Disputed: { label: 'Disputed', icon: AlertTriangle, tint: 'text-rose' },
+  Verified: { label: 'Verified', icon: ShieldCheck, tint: 'text-success' },
+  Pending: { label: 'Pending', icon: Hourglass, tint: 'text-warning' },
+  Disputed: { label: 'Disputed', icon: AlertTriangle, tint: 'text-danger' },
   'Needs Verification': {
     label: 'Needs Verification',
     icon: CircleDashed,
-    tint: 'text-amber',
+    tint: 'text-warning',
   },
-  'AI-Drafted': { label: 'AI-Drafted', icon: Sparkles, tint: 'text-violet' },
-  Simulated: { label: 'Simulated', icon: Workflow, tint: 'text-slate-400' },
+  'AI-Drafted': { label: 'AI-Drafted', icon: Sparkles, tint: 'text-primary' },
+  Simulated: { label: 'Simulated', icon: Workflow, tint: 'text-muted' },
 };
 
 // ─── Role cards for landing page ────────────────────────────────────────────────
 
 export const roleCards = [
-  { title: 'Officer', accent: 'bg-saffron/10 text-saffron', icon: ShieldCheck },
-  { title: 'Startup', accent: 'bg-teal/10 text-teal', icon: Workflow },
-  { title: 'Evaluator', accent: 'bg-violet/10 text-violet', icon: Sparkles },
-  { title: 'Validator', accent: 'bg-amber/10 text-amber', icon: AlertTriangle },
-  { title: 'Finance', accent: 'bg-rose/10 text-rose', icon: Landmark },
+  { title: 'Officer', accent: 'bg-primary/10 text-primary', icon: ShieldCheck },
+  { title: 'Startup', accent: 'bg-success/10 text-success', icon: Workflow },
+  { title: 'Evaluator', accent: 'bg-primary/10 text-primary', icon: Sparkles },
+  { title: 'Validator', accent: 'bg-warning/10 text-warning', icon: AlertTriangle },
+  { title: 'Finance', accent: 'bg-danger/10 text-danger', icon: Landmark },
   {
     title: 'Receiving District',
-    accent: 'bg-sky-400/10 text-sky-300',
+    accent: 'bg-primary/10 text-primary',
     icon: Building2,
   },
 ] as const;

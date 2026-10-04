@@ -35,9 +35,9 @@ export function DemoLoginPrompt() {
   };
 
   return (
-    <Card className='mx-auto max-w-xl border-saffron/30 p-6'>
+    <Card className='mx-auto max-w-xl border-primary/30 p-6'>
       <div className='mb-4 flex items-center gap-3'>
-        <span className='rounded-xl bg-saffron/10 p-2 text-saffron'><KeyRound className='h-5 w-5' /></span>
+        <span className='rounded-xl bg-primary/10 p-2 text-primary'><KeyRound className='h-5 w-5' /></span>
         <div>
           <h2 className='font-heading text-xl font-semibold text-text'>Officer demo access</h2>
           <p className='text-sm text-muted'>Sign in to create challenges and review synthetic startup profiles.</p>
@@ -48,7 +48,7 @@ export function DemoLoginPrompt() {
         <label className='grid gap-1 text-xs text-muted'>Password<input type='password' required value={password} onChange={(event) => setPassword(event.target.value)} /></label>
         <Button className='self-end' type='submit' isLoading={busy}>Sign in</Button>
       </form>
-      {error && <p role='alert' className='mt-3 text-sm text-rose'>{error}</p>}
+      {error && <p role='alert' className='mt-3 text-sm text-danger'>{error}</p>}
     </Card>
   );
 }

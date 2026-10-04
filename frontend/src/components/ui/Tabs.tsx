@@ -19,7 +19,7 @@ export function Tabs({ items }: TabsProps) {
             onClick={() => setActive(index)}
             className={cn(
               'flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-              index === active ? 'bg-saffron text-slate-950' : 'text-muted hover:text-text',
+              index === active ? 'bg-primary text-on-primary' : 'text-muted hover:text-text',
             )}
           >
             {item.label}

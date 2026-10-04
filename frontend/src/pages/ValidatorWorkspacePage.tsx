@@ -48,9 +48,9 @@ const DEMO_AGREEMENT_ID = 'demo-agreement';
 
 function outcomeStyles(outcome: EvidenceAnalysis['overall_outcome']) {
   switch (outcome) {
-    case 'passed':          return { text: 'All KPIs Passed',    icon: CheckCircle2,  color: 'text-green-400' };
-    case 'failed':          return { text: 'KPIs Failed',         icon: AlertTriangle, color: 'text-red-400' };
-    case 'missing_evidence':return { text: 'Missing Evidence',    icon: Info,          color: 'text-gray-400' };
+    case 'passed':          return { text: 'All KPIs Passed',    icon: CheckCircle2,  color: 'text-success' };
+    case 'failed':          return { text: 'KPIs Failed',         icon: AlertTriangle, color: 'text-danger' };
+    case 'missing_evidence':return { text: 'Missing Evidence',    icon: Info,          color: 'text-muted' };
     default:                return { text: 'Pending Analysis',    icon: Loader2,       color: 'text-muted' };
   }
 }
@@ -68,9 +68,9 @@ interface KPICardProps {
 
 function KPIOutcomeChip({ outcome }: { outcome: KPIResult['outcome'] }) {
   const styles = {
-    passed:           'bg-green-100 text-green-700 border-green-200',
-    failed:           'bg-red-100 text-red-700 border-red-200',
-    missing_evidence: 'bg-gray-100 text-gray-500 border-gray-200',
+    passed:           'bg-success/10 text-success border-success/30',
+    failed:           'bg-danger/10 text-danger border-danger/30',
+    missing_evidence: 'bg-raised text-muted border-border',
   };
   const labels = {
     passed: 'PASSED',
@@ -98,30 +98,30 @@ const KPICard: React.FC<KPICardProps> = ({ kpi, onReproduce }) => {
       <div className='grid grid-cols-3 gap-2 mb-3'>
         <div className='text-center'>
           <p className='text-[10px] text-muted uppercase tracking-wide mb-1'>Claimed</p>
-          <p className='font-mono font-bold text-blue-400 text-sm'>
+          <p className='font-mono font-bold text-primary text-sm'>
             {animClaimed != null ? `${animClaimed.toFixed(1)}${kpi.unit}` : '—'}
           </p>
         </div>
         <div className='text-center'>
           <p className='text-[10px] text-muted uppercase tracking-wide mb-1'>Recomputed</p>
           <p className={cn('font-mono font-bold text-sm',
-            kpi.outcome === 'passed' ? 'text-green-400' :
-            kpi.outcome === 'failed' ? 'text-red-400' : 'text-gray-400')}>
+            kpi.outcome === 'passed' ? 'text-success' :
+            kpi.outcome === 'failed' ? 'text-danger' : 'text-muted')}>
             {animRecomputed != null ? `${animRecomputed.toFixed(1)}${kpi.unit}` : '—'}
           </p>
         </div>
         <div className='text-center'>
           <p className='text-[10px] text-muted uppercase tracking-wide mb-1'>Delta</p>
           <p className={cn('font-mono font-bold text-sm',
-            animDelta != null && animDelta < 0 ? 'text-red-400' :
-            animDelta != null && animDelta > 0 ? 'text-green-400' : 'text-muted')}>
+            animDelta != null && animDelta < 0 ? 'text-danger' :
+            animDelta != null && animDelta > 0 ? 'text-success' : 'text-muted')}>
             {animDelta != null ? `${animDelta > 0 ? '+' : ''}${animDelta.toFixed(1)}${kpi.unit}` : '—'}
           </p>
         </div>
       </div>
       {kpi.threshold !== null && (
         <p className='text-[10px] text-muted mb-2'>
-          Threshold: <span className='text-saffron font-mono'>{kpi.threshold}{kpi.unit}</span>
+          Threshold: <span className='text-primary font-mono'>{kpi.threshold}{kpi.unit}</span>
           {' · '}
           Rows used: <span className='font-mono'>{kpi.rows_used}</span>
         </p>
@@ -129,7 +129,7 @@ const KPICard: React.FC<KPICardProps> = ({ kpi, onReproduce }) => {
       <p className='text-xs text-muted leading-relaxed mb-3'>{kpi.explanation}</p>
       <button
         onClick={() => onReproduce(kpi)}
-        className='text-xs font-medium text-saffron hover:text-saffron/80 underline underline-offset-2 transition-colors'
+        className='text-xs font-medium text-primary hover:text-primary/80 underline underline-offset-2 transition-colors'
       >
         Reproduce this result ↗
       </button>
@@ -146,9 +146,9 @@ interface DecisionModalProps {
 }
 
 const ACTION_META: Record<ValidatorAction, { label: string; color: string; warning?: string }> = {
-  accepted:             { label: 'Accept Evidence',       color: 'bg-green-600 hover:bg-green-500' },
-  disputed:             { label: 'Dispute Evidence',      color: 'bg-amber-500 hover:bg-amber-400' },
-  correction_requested: { label: 'Request Correction',    color: 'bg-orange-600 hover:bg-orange-500',
+  accepted:             { label: 'Accept Evidence',       color: 'bg-success text-on-primary hover:brightness-95' },
+  disputed:             { label: 'Dispute Evidence',      color: 'bg-warning text-text hover:brightness-95' },
+  correction_requested: { label: 'Request Correction',    color: 'bg-warning text-text hover:brightness-95',
     warning: 'This will move the milestone to "Correction Requested" status. The startup will need to resubmit.' },
 };
 
@@ -187,7 +187,7 @@ const DecisionModal: React.FC<DecisionModalProps> = ({ action, onConfirm, onClos
             </div>
 
             {meta?.warning && (
-              <div className='mb-4 rounded-lg border border-orange-400/30 bg-orange-500/10 p-3 text-xs text-orange-300 flex gap-2'>
+              <div className='mb-4 rounded-lg border border-warning/30 bg-warning/10 p-3 text-xs text-warning flex gap-2'>
                 <AlertTriangle size={14} className='shrink-0 mt-0.5' />
                 {meta.warning}
               </div>
@@ -203,7 +203,7 @@ const DecisionModal: React.FC<DecisionModalProps> = ({ action, onConfirm, onClos
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
                   placeholder='Provide a clear reason for this decision...'
-                  className='w-full rounded-xl border border-border bg-raised/40 px-3 py-2 text-sm text-text placeholder:text-muted resize-none focus:outline-none focus:ring-2 focus:ring-saffron/40'
+                  className='w-full rounded-xl border border-border bg-raised/40 px-3 py-2 text-sm text-text placeholder:text-muted resize-none focus:outline-none focus:ring-2 focus:ring-primary/40'
                 />
                 <p className='text-right text-[10px] text-muted mt-1'>{reason.trim().length}/20 min</p>
               </div>
@@ -215,7 +215,7 @@ const DecisionModal: React.FC<DecisionModalProps> = ({ action, onConfirm, onClos
                 disabled={!canSubmit}
                 onClick={() => { onConfirm(reason); onClose(); setReason(''); }}
                 className={cn(
-                  'inline-flex items-center justify-center rounded-md px-4 h-10 text-sm font-medium text-white transition-colors disabled:opacity-40 disabled:pointer-events-none',
+                  'inline-flex items-center justify-center rounded-md px-4 h-10 text-sm font-medium text-inverse-text transition-colors disabled:opacity-40 disabled:pointer-events-none',
                   meta?.color
                 )}
               >
@@ -350,7 +350,7 @@ export default function ValidatorWorkspacePage() {
       {/* ── Top bar ───────────────────────────────────────────────────────── */}
       <div className='shrink-0 border-b border-border bg-surface/80 backdrop-blur-md px-5 py-3 flex flex-wrap items-center gap-3'>
         <div className='flex items-center gap-2 mr-2'>
-          <ShieldCheck size={18} className='text-saffron' />
+          <ShieldCheck size={18} className='text-primary' />
           <h1 className='font-heading font-bold text-base text-text whitespace-nowrap'>
             Evidence Verification Workspace
           </h1>
@@ -366,14 +366,14 @@ export default function ValidatorWorkspacePage() {
               className={cn(
                 'px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors',
                 activeDataset === key
-                  ? 'border-saffron bg-saffron/10 text-saffron'
+                  ? 'border-primary bg-primary/10 text-primary'
                   : 'border-border text-muted hover:text-text hover:border-text/30'
               )}
             >
               {label}
             </button>
           ))}
-          <button disabled={loading} onClick={() => void refreshLatest()} className='px-3 py-1.5 rounded-lg text-xs font-medium border border-indigo-300 text-indigo-700 hover:bg-indigo-50 disabled:opacity-50'>Refresh latest submission</button>
+          <button disabled={loading} onClick={() => void refreshLatest()} className='px-3 py-1.5 rounded-lg text-xs font-medium border border-primary text-primary hover:bg-primary disabled:opacity-50'>Refresh latest submission</button>
         </div>
 
         <div className='flex items-center gap-2 ml-auto'>
@@ -403,12 +403,12 @@ export default function ValidatorWorkspacePage() {
       {/* ── Alerts ────────────────────────────────────────────────────────── */}
       <div className='shrink-0 px-5'>
         {error && (
-          <p role='alert' className='mt-2 rounded-xl border border-rose/30 bg-rose/5 px-3 py-2 text-xs text-rose flex items-center gap-2'>
+          <p role='alert' className='mt-2 rounded-xl border border-danger/30 bg-danger/5 px-3 py-2 text-xs text-danger flex items-center gap-2'>
             <AlertTriangle size={13} />{error}
           </p>
         )}
         {successMessage && (
-          <p role='status' className='mt-2 rounded-xl border border-teal/30 bg-teal/5 px-3 py-2 text-xs text-teal flex items-center gap-2'>
+          <p role='status' className='mt-2 rounded-xl border border-success/30 bg-success/5 px-3 py-2 text-xs text-success flex items-center gap-2'>
             <CheckCircle2 size={13} />{successMessage}
           </p>
         )}
@@ -434,19 +434,19 @@ export default function ValidatorWorkspacePage() {
             <div className={cn(
               'shrink-0 mx-4 mt-3 rounded-xl border px-4 py-3 flex items-start gap-3',
               analysis.overall_outcome === 'passed'
-                ? 'border-green-500/30 bg-green-500/5'
+                ? 'border-success/30 bg-success/5'
                 : analysis.overall_outcome === 'failed'
-                ? 'border-red-500/30 bg-red-500/5'
-                : 'border-gray-500/30 bg-gray-500/5'
+                ? 'border-danger/30 bg-danger/5'
+                : 'border-border/30 bg-raised/5'
             )}>
               <OutcomeIcon size={16} className={cn('mt-0.5 shrink-0', outcomeInfo.color)} />
               <div>
                 <p className={cn('text-xs font-bold', outcomeInfo.color)}>{outcomeInfo.text}</p>
                 <p className='text-[11px] text-muted mt-0.5 leading-relaxed'>{analysis.outcome_summary}</p>
-                {analysis.is_demo && <p className='mt-1 text-[10px] font-semibold text-indigo-500'>Synthetic demo evidence · decisions disabled</p>}
+                {analysis.is_demo && <p className='mt-1 text-[10px] font-semibold text-primary'>Synthetic demo evidence · decisions disabled</p>}
                 {analysis.milestone_status && <p className='mt-1 text-[10px] text-muted'>Milestone: {analysis.milestone_status}</p>}
                 {analysis.previous_version_marked_stale && (
-                  <p className='text-[10px] text-amber-400 mt-1'>⚠ Previous version marked stale</p>
+                  <p className='text-[10px] text-warning mt-1'>⚠ Previous version marked stale</p>
                 )}
               </div>
             </div>
@@ -514,21 +514,21 @@ export default function ValidatorWorkspacePage() {
                   disabled={!canAccept}
                   onClick={() => setDecisionAction('accepted')}
                   title={!canAccept ? 'Only a current, complete passing upload can be accepted' : 'Accept evidence'}
-                  className='px-3 py-1.5 rounded-lg text-xs font-medium bg-green-600/20 border border-green-600/40 text-green-400 hover:bg-green-600/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors'
+                  className='px-3 py-1.5 rounded-lg text-xs font-medium bg-success/20 border border-success/40 text-success hover:bg-success/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors'
                 >
                   ✓ Accept
                 </button>
                 <button
                   disabled={!analysis}
                   onClick={() => setDecisionAction('disputed')}
-                  className='px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-500/20 border border-amber-500/40 text-amber-400 hover:bg-amber-500/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors'
+                  className='px-3 py-1.5 rounded-lg text-xs font-medium bg-warning/20 border border-warning/40 text-warning hover:bg-warning/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors'
                 >
                   ⚑ Dispute
                 </button>
                 <button
                   disabled={!analysis}
                   onClick={() => setDecisionAction('correction_requested')}
-                  className='px-3 py-1.5 rounded-lg text-xs font-medium bg-orange-600/20 border border-orange-600/40 text-orange-400 hover:bg-orange-600/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors'
+                  className='px-3 py-1.5 rounded-lg text-xs font-medium bg-warning/20 border border-warning/40 text-warning hover:bg-warning/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors'
                 >
                   ↺ Request Correction
                 </button>

@@ -45,15 +45,15 @@ export function LifecycleRail({ currentStage, blockedStage, staleStages = [] }: 
           return (
             <li key={stage} className="relative flex w-[150px] shrink-0 flex-col items-center px-2 text-center">
               {index < lifecycleStages.length - 1 && (
-                <span className={cn('absolute left-1/2 top-4 h-px w-full', isComplete ? 'bg-teal' : 'bg-border')} aria-hidden="true" />
+                <span className={cn('absolute left-1/2 top-4 h-px w-full', isComplete ? 'bg-success' : 'bg-border')} aria-hidden="true" />
               )}
               <span
                 className={cn(
                   'relative z-10 flex h-8 w-8 items-center justify-center rounded-full border',
-                  state === 'completed' && 'border-teal bg-teal/15 text-teal',
-                  state === 'current' && 'border-saffron bg-saffron text-slate-950 ring-4 ring-saffron/15',
-                  state === 'blocked' && 'border-rose bg-rose/15 text-rose',
-                  state === 'stale' && 'border-amber bg-amber/15 text-amber',
+                  state === 'completed' && 'border-success bg-success/15 text-success',
+                  state === 'current' && 'border-primary bg-primary text-on-primary ring-4 ring-primary/15',
+                  state === 'blocked' && 'border-danger bg-danger/15 text-danger',
+                  state === 'stale' && 'border-warning bg-warning/15 text-warning',
                   state === 'upcoming' && 'border-border bg-raised text-muted',
                 )}
                 title={state}

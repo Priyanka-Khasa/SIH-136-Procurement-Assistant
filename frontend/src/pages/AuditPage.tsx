@@ -131,10 +131,10 @@ export default function AuditPage() {
         </div>
       </div>
 
-      {error && <div role="alert" className="rounded-xl border border-rose/40 bg-rose/10 p-4 text-sm text-rose">{error}</div>}
+      {error && <div role="alert" className="rounded-xl border border-danger/40 bg-danger/10 p-4 text-sm text-danger">{error}</div>}
 
       {!authToken && (
-        <Card className="border-saffron/30 p-4">
+        <Card className="border-primary/30 p-4">
           <form onSubmit={demoLogin} className="flex flex-wrap items-end gap-3">
             <div className="mr-auto">
               <p className="font-semibold text-text">Sign in to view the protected audit trail</p>
@@ -149,9 +149,9 @@ export default function AuditPage() {
 
       {verification && (
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-          <Card className={verification.valid ? 'border-teal/40 p-4' : 'border-rose/40 p-4'}>
+          <Card className={verification.valid ? 'border-success/40 p-4' : 'border-danger/40 p-4'}>
             <div className="flex items-start gap-3">
-              {verification.valid ? <CheckCircle2 className="mt-0.5 h-5 w-5 text-teal" /> : <AlertTriangle className="mt-0.5 h-5 w-5 text-rose" />}
+              {verification.valid ? <CheckCircle2 className="mt-0.5 h-5 w-5 text-success" /> : <AlertTriangle className="mt-0.5 h-5 w-5 text-danger" />}
               <div>
                 <p className="font-semibold text-text">{verification.valid ? 'Integrity check passed' : `Integrity break at event ${verification.first_broken_sequence}`}</p>
                 <p className="mt-1 text-sm text-muted">{verification.message} Checked {verification.checked_events} event(s).</p>
@@ -182,22 +182,22 @@ export default function AuditPage() {
             {events.length === 0 ? 'No audit events found for this pilot yet.' : 'No events match this filter.'}
           </div>
         ) : (
-          <ol className="relative space-y-4 before:absolute before:bottom-5 before:left-[15px] before:top-5 before:w-px before:bg-gradient-to-b before:from-saffron before:via-border before:to-transparent">
+          <ol className="relative space-y-4 before:absolute before:bottom-5 before:left-[15px] before:top-5 before:w-px before:bg-gradient-to-b before:from-primary before:via-border before:to-transparent">
             <AnimatePresence initial={false}>
               {visibleEvents.map((event) => {
                 const state = linkStates[event.sequence] ?? 'unchecked';
                 return (
                   <motion.li key={`${event.pilot_id}-${event.sequence}`} layout initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} className="relative pl-10">
-                    <span className={`absolute left-1 top-3 z-10 h-5 w-5 rounded-full border-2 border-surface ${state === 'valid' ? 'bg-teal' : state === 'broken' ? 'bg-rose' : 'bg-saffron'}`} />
-                    <div className={`rounded-xl border bg-surface/70 p-4 ${state === 'broken' ? 'border-rose/60' : state === 'valid' ? 'border-teal/30' : 'border-border'}`}>
+                    <span className={`absolute left-1 top-3 z-10 h-5 w-5 rounded-full border-2 border-surface ${state === 'valid' ? 'bg-success' : state === 'broken' ? 'bg-danger' : 'bg-primary'}`} />
+                    <div className={`rounded-xl border bg-surface/70 p-4 ${state === 'broken' ? 'border-danger/60' : state === 'valid' ? 'border-success/30' : 'border-border'}`}>
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
                           <p className="text-xs font-mono text-muted">#{event.sequence} · {event.pilot_id} · {event.event_type}</p>
-                          <h3 className="mt-1 font-semibold text-text">{event.before_state} <span className="text-saffron">→</span> {event.after_state}</h3>
+                          <h3 className="mt-1 font-semibold text-text">{event.before_state} <span className="text-primary">→</span> {event.after_state}</h3>
                           <p className="mt-1 text-sm text-muted">{event.reason || 'No additional reason recorded.'}</p>
                           <p className="mt-2 text-xs text-muted">{event.actor} · {event.role} · {new Date(event.created_at).toLocaleString()}</p>
                         </div>
-                        <Fingerprint className={`h-4 w-4 ${state === 'valid' ? 'text-teal' : state === 'broken' ? 'text-rose' : 'text-muted'}`} aria-label={`Hash link ${state}`} />
+                        <Fingerprint className={`h-4 w-4 ${state === 'valid' ? 'text-success' : state === 'broken' ? 'text-danger' : 'text-muted'}`} aria-label={`Hash link ${state}`} />
                       </div>
                       <details className="mt-3 text-xs">
                         <summary className="cursor-pointer text-muted">Show hash link</summary>
